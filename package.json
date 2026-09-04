@@ -1,0 +1,14 @@
+{
+  "name": "parquet-comparison-app",
+  "version": "1.0.0",
+  "description": "Parquet file comparison application with React frontend and Python backend",
+  "scripts": {
+    "start": "node start.js",
+    "start:backend": "cd backend && python main.py",
+    "start:frontend": "cd frontend && npm run dev",
+    "stop": "node stop.js"
+  },
+  "keywords": ["parquet", "comparison", "react", "python"],
+  "author": "",
+  "license": "MIT"
+}
