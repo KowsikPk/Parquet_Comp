@@ -463,13 +463,22 @@ class ComparisonEngine:
                     })
                 else:
                     matching += 1
-                    # G. Don't return full row data for matching rows
+                    row_data_a = {}
+                    row_data_b = {}
+                    for col in all_display_columns:
+                        col_a = f"{col}_a" if f"{col}_a" in row else col
+                        col_b = f"{col}_b" if f"{col}_b" in row else col
+                        if col_a in row and pd.notna(row[col_a]):
+                            row_data_a[col] = self._convert_to_json_format(row[col_a])
+                        if col_b in row and pd.notna(row[col_b]):
+                            row_data_b[col] = self._convert_to_json_format(row[col_b])
+                            
                     results.append({
                         "row_key": row_key,
                         "status": "match",
                         "differences": [],
-                        "row_data_a": {},
-                        "row_data_b": {}
+                        "row_data_a": row_data_a,
+                        "row_data_b": row_data_b
                     })
         
         stats = {
@@ -578,13 +587,20 @@ class ComparisonEngine:
                 # Rows match based on content
                 matching += 1
                 
-                # UI IMPROVEMENT: Don't return full row data for matched
+                row_data_a = {}
+                row_data_b = {}
+                for col in all_display_columns:
+                    if col in row_a:
+                        row_data_a[col] = self._convert_to_json_format(ensure_scalar(row_a[col]))
+                    if col in row_b:
+                        row_data_b[col] = self._convert_to_json_format(ensure_scalar(row_b[col]))
+                
                 results.append({
                     "row_key": f"row_{idx_a}",
                     "status": "match",
                     "differences": [],
-                    "row_data_a": {},
-                    "row_data_b": {}
+                    "row_data_a": row_data_a,
+                    "row_data_b": row_data_b
                 })
             else:
                 # Row only in A (no matching content in B)

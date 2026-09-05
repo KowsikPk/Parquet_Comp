@@ -182,8 +182,9 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
             <tr className="bg-theme-elevated text-[11px] font-bold text-theme-text-secondary uppercase tracking-wider border-b border-theme-border">
               <th className="px-4 py-3">Row Key</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">ObjectClass</th>
-              <th className="px-4 py-3">Properties Summary</th>
+              {columnsCompared.slice(0, 4).map(col => (
+                <th key={col} className="px-4 py-3">{col}</th>
+              ))}
               <th className="px-4 py-3 text-right">Action</th>
             </tr>
           </thead>
@@ -193,12 +194,17 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
                 <tr className="hover:bg-theme-elevated/60 transition-colors">
                   <td className="px-4 py-3 font-mono font-bold text-theme-text">{result.row_key}</td>
                   <td className="px-4 py-3">{getStatusBadge(result.status)}</td>
-                  <td className="px-4 py-3 text-theme-text-secondary font-mono">
-                    {result.row_data_a?.['ObjectClass'] || result.row_data_b?.['ObjectClass'] || '—'}
-                  </td>
-                  <td className="px-4 py-3 text-theme-text-secondary truncate max-w-xs font-mono">
-                    {result.row_data_a?.['properties'] || result.row_data_b?.['properties'] || '—'}
-                  </td>
+                  {columnsCompared.slice(0, 4).map(col => {
+                    const val = result.row_data_a?.[col] ?? result.row_data_b?.[col];
+                    const displayVal = typeof val === 'object' && val !== null 
+                      ? JSON.stringify(val).substring(0, 50) + (JSON.stringify(val).length > 50 ? '...' : '') 
+                      : String(val ?? '—');
+                    return (
+                      <td key={col} className="px-4 py-3 text-theme-text-secondary truncate max-w-xs font-mono" title={displayVal}>
+                        {displayVal}
+                      </td>
+                    );
+                  })}
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"

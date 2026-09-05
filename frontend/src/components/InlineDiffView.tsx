@@ -56,10 +56,14 @@ const InlineDiffView: React.FC<InlineDiffViewProps> = ({
 
   const getDisplayColumnData = (rowData: any) => {
     if (!rowData) return [];
-    return displayColumns.map(col => ({
-      key: col,
-      value: rowData[col]
-    })).filter(item => item.value !== undefined);
+    
+    return Object.keys(rowData)
+      .filter(col => col !== 'properties')
+      .map(col => ({
+        key: col,
+        value: rowData[col]
+      }))
+      .filter(item => item.value !== undefined);
   };
 
   const getPropertiesData = (rowData: any) => {
