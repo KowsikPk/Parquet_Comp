@@ -349,5 +349,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    # DOCKER: Run on 127.0.0.1 for Docker (Nginx proxies requests)
+    # DOCKER: Run on 127.0.0.1 for single-container setup
     uvicorn.run(app, host="127.0.0.1", port=8000)

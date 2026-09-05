@@ -7,7 +7,6 @@ interface ResultsTableProps {
   filter: 'all' | 'match' | 'mismatch' | 'only_in_a' | 'only_in_b';
   onFilterChange: (filter: 'all' | 'match' | 'mismatch' | 'only_in_a' | 'only_in_b') => void;
   columnsCompared: string[];
-  displayColumns?: string[];
   fileAName?: string;
   fileBName?: string;
 }
@@ -17,7 +16,6 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
   filter,
   onFilterChange,
   columnsCompared,
-  displayColumns = [],
   fileAName = 'File A',
   fileBName = 'File B'
 }) => {
@@ -224,7 +222,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
                   <tr>
                     <td colSpan={5} className="p-0 bg-theme-base">
                       <div className="p-4 border-b border-theme-border animate-slide-up">
-                        <InlineDiffView result={result} fileAName={fileAName} fileBName={fileBName} displayColumns={displayColumns} />
+                        <InlineDiffView result={result} fileAName={fileAName} fileBName={fileBName} />
                       </div>
                     </td>
                   </tr>

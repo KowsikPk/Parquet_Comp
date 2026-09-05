@@ -558,7 +558,6 @@ const App: React.FC = () => {
                   filter={filter}
                   onFilterChange={setFilter}
                   columnsCompared={comparisonResult.columns_compared}
-                  displayColumns={displayColumns}
                   fileAName={fileADisplayName}
                   fileBName={fileBDisplayName}
                 />

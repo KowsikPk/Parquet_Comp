@@ -5,14 +5,12 @@ interface InlineDiffViewProps {
   result: ComparisonResult;
   fileAName?: string;
   fileBName?: string;
-  displayColumns?: string[];
 }
 
 const InlineDiffView: React.FC<InlineDiffViewProps> = ({
   result,
   fileAName = 'File A',
-  fileBName = 'File B',
-  displayColumns = []
+  fileBName = 'File B'
 }) => {
   const getDiffKeys = (propsA: any, propsB: any) => {
     if (!propsA || !propsB) return [];
