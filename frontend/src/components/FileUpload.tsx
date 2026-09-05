@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 
-// UI IMPROVEMENT: Translation-ready constants
 const t = (key: string): string => key;
 
 interface FileUploadProps {
@@ -14,6 +13,7 @@ interface FileUploadProps {
     file_size: number;
   };
   onRemove?: () => void;
+  accentColor?: 'indigo' | 'violet';
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
@@ -22,10 +22,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
   selectedFile,
   disabled = false,
   metadata,
-  onRemove
+  onRemove,
+  accentColor = 'indigo'
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isIndigo = accentColor === 'indigo';
+  const borderHighlight = isIndigo ? 'hover:border-blue-500/50' : 'hover:border-sky-500/50';
+  const dragActiveBorder = isIndigo ? 'border-blue-500 bg-blue-500/10' : 'border-sky-500 bg-sky-500/10';
+  const badgeGradient = isIndigo ? 'from-blue-600 to-blue-700' : 'from-sky-600 to-sky-700';
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -50,7 +56,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         setError(null);
         onFileSelect(file);
       } else {
-        setError(t('upload.error_parquet_only'));
+        setError(t('Please select a valid .parquet file'));
       }
     }
   }, [disabled, onFileSelect]);
@@ -65,70 +71,74 @@ const FileUpload: React.FC<FileUploadProps> = ({
         setError(null);
         onFileSelect(file);
       } else {
-        setError(t('upload.error_parquet_only'));
+        setError(t('Please select a valid .parquet file'));
       }
     }
   }, [disabled, onFileSelect]);
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 10) / 10 + ' ' + sizes[i];
   };
 
-  const truncateFilename = (name: string, maxLength: number = 28): string => {
+  const truncateFilename = (name: string, maxLength: number = 30): string => {
     return name.length > maxLength ? name.substring(0, maxLength) + '...' : name;
   };
 
-  // Display label: show filename after selection, otherwise show default label
-  const displayLabel = selectedFile ? truncateFilename(selectedFile.name, 35) : label;
-
   return (
-    <div className="w-[48%]">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" title={selectedFile?.name}>
-        {displayLabel}
-      </label>
+    <div className="w-full flex-1">
+      {/* Top Header & Badge */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-2">
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r ${badgeGradient} text-white shadow-sm`}>
+            {label}
+          </span>
+          {selectedFile && (
+            <span className="text-xs text-theme-text-secondary font-mono truncate max-w-[200px]" title={selectedFile.name}>
+              {selectedFile.name}
+            </span>
+          )}
+        </div>
+        {selectedFile && (
+          <span className="flex items-center space-x-1 text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Ready</span>
+          </span>
+        )}
+      </div>
+
+      {/* Upload Zone Card */}
       <div
-        className={`relative min-h-[200px] border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 ${
+        className={`relative min-h-[220px] rounded-2xl p-6 transition-all duration-300 border-2 border-dashed flex flex-col items-center justify-center text-center ${
           isDragging
-            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+            ? `${dragActiveBorder} scale-[1.01] shadow-xl`
             : selectedFile
-            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${
-          isDragging ? 'animate-pulse-border' : ''
-        }`}
+            ? 'bg-theme-surface border-slate-700/60 shadow-lg'
+            : `bg-theme-surface/70 border-theme-border ${borderHighlight} hover:bg-theme-surface`
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* UI IMPROVEMENT #1: Remove button with X icon */}
+        {/* Remove Button */}
         {selectedFile && onRemove && (
           <button
             onClick={(e) => {
               e.stopPropagation();
               onRemove();
             }}
-            className="absolute top-3 left-3 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors"
-            aria-label={t('upload.remove_file')}
+            className="absolute top-3 right-3 p-1.5 bg-theme-elevated hover:bg-red-500/20 text-theme-text-secondary hover:text-red-400 rounded-lg border border-theme-border transition-all"
+            title="Remove file"
           >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        )}
-
-        {/* UI IMPROVEMENT #1: Success checkmark */}
-        {selectedFile && (
-          <div className="absolute top-3 right-3 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-              <polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
-          </div>
         )}
 
         <input
@@ -136,88 +146,83 @@ const FileUpload: React.FC<FileUploadProps> = ({
           accept=".parquet"
           onChange={handleFileInput}
           className="hidden"
-          id={`file-input-${label}`}
+          id={`file-input-${label.replace(/\s+/g, '-')}`}
           disabled={disabled}
         />
+
         <label
-          htmlFor={`file-input-${label}`}
-          className={`cursor-pointer h-full flex flex-col items-center justify-center ${disabled ? 'pointer-events-none' : ''}`}
+          htmlFor={`file-input-${label.replace(/\s+/g, '-')}`}
+          className={`w-full h-full cursor-pointer flex flex-col items-center justify-center ${disabled ? 'pointer-events-none' : ''}`}
         >
           {selectedFile ? (
-            <div className="w-full">
-              {/* UI IMPROVEMENT #1: File chip with DATABASE icon */}
-              <div className="flex items-center justify-center mb-3">
-                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 mr-2" style={{fontSize: '1.5rem'}}>
-                  <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                </svg>
-                <div className="text-green-600 dark:text-green-400 font-bold text-lg" style={{fontSize: '1.125rem'}}>
-                  {truncateFilename(selectedFile.name, 200)}
-                </div>
-              </div>
-              
-              {/* UI IMPROVEMENT #2: File metadata row with DATABASE icon */}
-              {metadata && (
-                <div className="flex items-center justify-center text-gray-500 dark:text-gray-400 mb-4" style={{fontSize: '0.8rem'}}>
-                  <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+            <div className="w-full space-y-4">
+              {/* File Icon & Name */}
+              <div className="flex items-center justify-center space-x-3">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isIndigo ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30' : 'bg-sky-500/10 text-sky-400 border border-sky-500/30'}`}>
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <ellipse cx="12" cy="5" rx="9" ry="3"/>
                     <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
                     <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                   </svg>
-                  {metadata.row_count} rows · {metadata.columns} columns · {formatFileSize(metadata.file_size)}
                 </div>
-              )}
-              
-              {/* Metadata mini-grid */}
+                <div className="text-left">
+                  <div className="font-bold text-theme-text text-sm tracking-tight" title={selectedFile.name}>
+                    {truncateFilename(selectedFile.name, 28)}
+                  </div>
+                  <div className="text-xs text-theme-text-secondary font-mono">.parquet dataset</div>
+                </div>
+              </div>
+
+              {/* Metadata Mini-Grid */}
               {metadata && (
-                <div className="grid grid-cols-3 gap-2 mt-4">
-                  <div className="bg-white dark:bg-[#0F1117] rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1" style={{fontSize: '0.75rem'}}>Rows</div>
-                    <div className="text-sm font-bold text-gray-900 dark:text-[#F1F5F9]" style={{fontSize: '0.875rem'}}>{metadata.row_count}</div>
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-theme-border">
+                  <div className="bg-theme-elevated p-2.5 rounded-xl border border-theme-border text-center">
+                    <span className="block text-[10px] font-semibold text-theme-text-secondary uppercase">Rows</span>
+                    <span className="text-xs font-bold text-theme-text font-mono">{metadata.row_count.toLocaleString()}</span>
                   </div>
-                  <div className="bg-white dark:bg-[#0F1117] rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1" style={{fontSize: '0.75rem'}}>Columns</div>
-                    <div className="text-sm font-bold text-gray-900 dark:text-[#F1F5F9]" style={{fontSize: '0.875rem'}}>{metadata.columns}</div>
+                  <div className="bg-theme-elevated p-2.5 rounded-xl border border-theme-border text-center">
+                    <span className="block text-[10px] font-semibold text-theme-text-secondary uppercase">Columns</span>
+                    <span className="text-xs font-bold text-theme-text font-mono">{metadata.columns}</span>
                   </div>
-                  <div className="bg-white dark:bg-[#0F1117] rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1" style={{fontSize: '0.75rem'}}>Size</div>
-                    <div className="text-sm font-bold text-gray-900 dark:text-[#F1F5F9]" style={{fontSize: '0.875rem'}}>{formatFileSize(metadata.file_size)}</div>
+                  <div className="bg-theme-elevated p-2.5 rounded-xl border border-theme-border text-center">
+                    <span className="block text-[10px] font-semibold text-theme-text-secondary uppercase">Size</span>
+                    <span className="text-xs font-bold text-theme-text font-mono">{formatFileSize(metadata.file_size)}</span>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center">
-              {/* UI IMPROVEMENT #1: UPLOAD icon for empty state */}
-              <div className={`mb-4 ${isDragging ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`} style={{fontSize: '2.5rem'}}>
-                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
+            <div className="space-y-3">
+              <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${
+                isIndigo ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+              }`}>
+                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
-              
-              <div className="text-gray-500 dark:text-gray-400 font-medium mb-1" style={{fontSize: '0.875rem'}}>
-                {isDragging ? 'Release to upload' : `Drop ${label} here`}
+
+              <div>
+                <p className="text-sm font-semibold text-theme-text">
+                  {isDragging ? `Drop ${label} here` : `Drag & drop ${label}`}
+                </p>
+                <p className="text-xs text-theme-text-secondary mt-1">or click to browse from disk</p>
               </div>
-              <div className="text-sm text-gray-400 dark:text-gray-500" style={{fontSize: '0.8rem'}}>
-                Click to browse
+
+              <div className="inline-block px-3 py-1 bg-theme-elevated text-theme-text-secondary text-[11px] font-mono rounded-lg border border-theme-border">
+                Supports .parquet format
               </div>
             </div>
           )}
         </label>
       </div>
-      
-      {/* UI IMPROVEMENT #1: Error state with WARNING TRIANGLE icon */}
+
+      {/* Error Message */}
       {error && (
-        <div className="mt-2 flex items-center text-red-500" style={{fontSize: '0.875rem'}}>
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
+        <div className="mt-2 text-xs text-red-400 flex items-center space-x-1 font-medium bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20">
+          <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          {error}
+          <span>{error}</span>
         </div>
       )}
     </div>

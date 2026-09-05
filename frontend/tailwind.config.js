@@ -8,16 +8,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Dark mode palette
-        dark: {
-          bg: '#0F1117',
-          card: '#1A1D27',
-          border: '#2D3148',
-          text: {
-            primary: '#F1F5F9',
-            secondary: '#94A3B8',
-          },
-          hover: '#1E2130',
+        // Theme-aware colors using CSS variables (support opacity via <alpha-value>)
+        'theme-base': 'rgb(var(--color-base) / <alpha-value>)',
+        'theme-surface': 'rgb(var(--color-surface) / <alpha-value>)',
+        'theme-elevated': 'rgb(var(--color-elevated) / <alpha-value>)',
+        'theme-muted': 'rgb(var(--color-muted) / <alpha-value>)',
+        'theme-border': 'rgb(var(--color-border) / <alpha-value>)',
+        'theme-text': {
+          DEFAULT: 'rgb(var(--color-text-primary) / <alpha-value>)',
+          'secondary': 'rgb(var(--color-text-secondary) / <alpha-value>)',
+          'muted': 'rgb(var(--color-text-muted) / <alpha-value>)',
         },
       },
       animation: {

@@ -73,7 +73,7 @@ def values_are_equal(val_a: Any, val_b: Any) -> bool:
     return norm_a == norm_b
 
 
-def compare_json_objects(obj_a: Any, obj_b: Any) -> bool:
+def compare_json_objects(obj_a: Any, obj_b: Any, _is_normalized: bool = False) -> bool:
     """
     Compare two JSON objects strictly:
     - Key order doesn't matter
@@ -81,8 +81,12 @@ def compare_json_objects(obj_a: Any, obj_b: Any) -> bool:
     - All fields must be compared
     - Nested structures are handled recursively
     """
-    norm_a = normalize_value(obj_a)
-    norm_b = normalize_value(obj_b)
+    if not _is_normalized:
+        norm_a = normalize_value(obj_a)
+        norm_b = normalize_value(obj_b)
+    else:
+        norm_a = obj_a
+        norm_b = obj_b
     
     # If both are dicts, compare all keys strictly
     if isinstance(norm_a, dict) and isinstance(norm_b, dict):
@@ -92,7 +96,7 @@ def compare_json_objects(obj_a: Any, obj_b: Any) -> bool:
         
         # Compare all keys
         for key in norm_a.keys():
-            if not compare_json_objects(norm_a[key], norm_b[key]):
+            if not compare_json_objects(norm_a[key], norm_b[key], _is_normalized=True):
                 return False
         return True
     
@@ -101,7 +105,7 @@ def compare_json_objects(obj_a: Any, obj_b: Any) -> bool:
         if len(norm_a) != len(norm_b):
             return False
         for a_item, b_item in zip(norm_a, norm_b):
-            if not compare_json_objects(a_item, b_item):
+            if not compare_json_objects(a_item, b_item, _is_normalized=True):
                 return False
         return True
     
@@ -109,13 +113,17 @@ def compare_json_objects(obj_a: Any, obj_b: Any) -> bool:
     return norm_a == norm_b
 
 
-def get_json_differences(obj_a: Any, obj_b: Any) -> List[str]:
+def get_json_differences(obj_a: Any, obj_b: Any, _is_normalized: bool = False) -> List[str]:
     """
     Get detailed differences between two JSON objects.
     Returns a list of difference descriptions.
     """
-    norm_a = normalize_value(obj_a)
-    norm_b = normalize_value(obj_b)
+    if not _is_normalized:
+        norm_a = normalize_value(obj_a)
+        norm_b = normalize_value(obj_b)
+    else:
+        norm_a = obj_a
+        norm_b = obj_b
     differences = []
     
     if isinstance(norm_a, dict) and isinstance(norm_b, dict):
@@ -126,7 +134,7 @@ def get_json_differences(obj_a: Any, obj_b: Any) -> List[str]:
                 differences.append(f"Field '{key}' only in File B: {norm_b[key]}")
             elif key not in norm_b:
                 differences.append(f"Field '{key}' only in File A: {norm_a[key]}")
-            elif not compare_json_objects(norm_a[key], norm_b[key]):
+            elif not compare_json_objects(norm_a[key], norm_b[key], _is_normalized=True):
                 differences.append(f"Field '{key}' differs: A={norm_a[key]}, B={norm_b[key]}")
     
     elif norm_a != norm_b:

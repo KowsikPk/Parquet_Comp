@@ -37,120 +37,83 @@ const ResultsFilterPanel: React.FC<ResultsFilterPanelProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Truncate filename for display
-  const truncateFilename = (name: string, maxLength: number = 20) => {
+  const truncateFilename = (name: string, maxLength: number = 14) => {
     if (name.length <= maxLength) return name;
-    const ext = name.includes('.') ? '.' + name.split('.').pop() : '';
-    const baseName = name.replace(ext, '');
-    return baseName.substring(0, maxLength - ext.length - 3) + '...' + ext;
+    return name.substring(0, maxLength - 3) + '...';
   };
 
-  // Generate filter summary
   const getFilterSummary = () => {
     const totalFilters = fileAFilters.length + fileBFilters.length;
-    if (totalFilters === 0) return 'No filters applied';
-    
-    const parts = [];
-    if (fileAFilters.length > 0) {
-      parts.push(`${truncateFilename(fileAName, 15)}: ${fileAFilters.length}`);
-    }
-    if (fileBFilters.length > 0) {
-      parts.push(`${truncateFilename(fileBName, 15)}: ${fileBFilters.length}`);
-    }
-    return parts.join(' | ');
+    if (totalFilters === 0) return 'No active filters';
+    return `${fileAFilters.length} rule(s) for ${truncateFilename(fileAName)} • ${fileBFilters.length} rule(s) for ${truncateFilename(fileBName)}`;
   };
 
   return (
-    <div className="bg-white dark:bg-[#1A1D27] rounded-lg shadow border-l-4 border-indigo-500 mb-6">
-      {/* UI IMPROVEMENT #15: Header with SETTINGS icon and CHEVRON RIGHT */}
-      <div 
-        className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-[#1E2130] transition-colors"
+    <div className="bg-theme-surface border border-theme-border rounded-2xl shadow-lg mb-6 overflow-hidden">
+      {/* Header bar */}
+      <div
+        className="p-4 flex items-center justify-between cursor-pointer hover:bg-theme-elevated transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center space-x-3">
-          {/* UI IMPROVEMENT #15: CHEVRON RIGHT that rotates */}
-          <svg
-            className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <button
+            type="button"
+            className="p-1 rounded-lg text-theme-text-secondary hover:text-theme-text transition-transform duration-200"
           >
-            <polyline points="9 18 15 12 15 9 6"/>
-          </svg>
-          {/* UI IMPROVEMENT #15: SETTINGS icon before "Edit Filters" */}
-          <div className="flex items-center">
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{fontSize: '1rem'}}>
-              <line x1="4" y1="21" x2="4" y2="14"/>
-              <line x1="4" y1="10" x2="4" y2="3"/>
-              <line x1="12" y1="21" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12" y2="3"/>
-              <line x1="20" y1="21" x2="20" y2="16"/>
-              <line x1="20" y1="12" x2="20" y2="3"/>
-              <line x1="1" y1="14" x2="7" y2="14"/>
-              <line x1="9" y1="8" x2="15" y2="8"/>
-              <line x1="17" y1="16" x2="23" y2="16"/>
+            <svg className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-[#F1F5F9]" style={{fontSize: '1.125rem'}}>
-                Edit Filters
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400" style={{fontSize: '0.875rem'}}>
-                {getFilterSummary()}
-              </p>
+          </button>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-sm font-bold text-theme-text">Adjust Row Filters</h3>
+              {(fileAFilters.length + fileBFilters.length) > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  {fileAFilters.length + fileBFilters.length} active
+                </span>
+              )}
             </div>
+            <p className="text-xs text-theme-text-secondary mt-0.5">{getFilterSummary()}</p>
           </div>
         </div>
-        
-        {/* UI IMPROVEMENT #14: REFRESH icon for Re-run Compare button */}
+
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onRerunComparison();
           }}
           disabled={isComparing}
-          className="px-4 py-2 bg-green-500 dark:bg-green-600 text-white rounded-lg hover:bg-green-600 dark:hover:bg-green-500 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed font-medium flex items-center space-x-2 transition-colors"
-          style={{minWidth: '80px', fontSize: '0.875rem'}}
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-theme-muted disabled:text-theme-text-muted text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center space-x-2 transition-all"
         >
           {isComparing ? (
             <>
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin" style={{fontSize: '1rem'}}>
-                <line x1="12" y1="2" x2="12" y2="6"/>
-                <line x1="12" y1="18" x2="12" y2="22"/>
-                <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
-                <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-                <line x1="2" y1="12" x2="6" y2="12"/>
-                <line x1="18" y1="12" x2="22" y2="12"/>
-                <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
-                <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+              <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              <span>Comparing...</span>
+              <span>Re-evaluating...</span>
             </>
           ) : (
             <>
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1rem'}}>
-                <polyline points="1 4 1 10 7 10"/>
-                <polyline points="23 20 23 14 17 14"/>
-                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              <span>Re-run Compare</span>
+              <span>Re-run Diff</span>
             </>
           )}
         </button>
       </div>
 
-      {/* Expandable Content */}
+      {/* Expandable filters section */}
       {isExpanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4 animate-fade-in space-y-4">
-          {/* UI IMPROVEMENT #16: Individual File Filters with color */}
+        <div className="p-4 border-t border-theme-border space-y-4 animate-slide-up bg-theme-base">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <AdvancedFilter
               columns={columnsA}
               filters={fileAFilters}
               onFiltersChange={onFileAFiltersChange}
-              label={`${truncateFilename(fileAName, 25)} Filters`}
+              label={`${truncateFilename(fileAName)} Filters`}
               disabled={isComparing}
               fileId={fileAId}
               copyFromFilters={copyFromBFilters}
@@ -161,19 +124,13 @@ const ResultsFilterPanel: React.FC<ResultsFilterPanelProps> = ({
               columns={columnsB}
               filters={fileBFilters}
               onFiltersChange={onFileBFiltersChange}
-              label={`${truncateFilename(fileBName, 25)} Filters`}
+              label={`${truncateFilename(fileBName)} Filters`}
               disabled={isComparing}
               fileId={fileBId}
               copyFromFilters={copyFromAFilters}
               onCopyFromFilters={onFileBFiltersChange}
               fileColor="purple"
             />
-          </div>
-          
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              <strong>Tip:</strong> Modify filters above and click "Re-run Compare" to update results without re-uploading files.
-            </p>
           </div>
         </div>
       )}

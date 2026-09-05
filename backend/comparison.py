@@ -155,8 +155,15 @@ class ComparisonEngine:
                 try:
                     # Create composite key column for reliable matching
                     print(f"Creating composite join key from: {join_keys}")
-                    df_a['_join_key'] = df_a[join_keys].apply(lambda row: '|'.join(str(x) for x in row), axis=1)
-                    df_b['_join_key'] = df_b[join_keys].apply(lambda row: '|'.join(str(x) for x in row), axis=1)
+                    if len(join_keys) == 1:
+                        df_a['_join_key'] = df_a[join_keys[0]].astype(str)
+                        df_b['_join_key'] = df_b[join_keys[0]].astype(str)
+                    else:
+                        df_a['_join_key'] = df_a[join_keys[0]].astype(str)
+                        df_b['_join_key'] = df_b[join_keys[0]].astype(str)
+                        for key in join_keys[1:]:
+                            df_a['_join_key'] = df_a['_join_key'] + '|' + df_a[key].astype(str)
+                            df_b['_join_key'] = df_b['_join_key'] + '|' + df_b[key].astype(str)
                     
                     print(f"Setting join key as index")
                     df_a_indexed = df_a.set_index('_join_key', drop=False)
@@ -199,8 +206,14 @@ class ComparisonEngine:
         # Process in chunks if large
         if total_rows > chunk_size:
             print(f"Processing in chunks (chunk_size: {chunk_size})")
-            num_chunks = (total_rows // chunk_size) + 1
+            num_chunks = (total_rows + chunk_size - 1) // chunk_size
             print(f"Number of chunks: {num_chunks}")
+            
+            # Pre-calculate keys if using join keys
+            all_keys = None
+            if not use_index:
+                all_keys = sorted(set(df_a_indexed.index.tolist()) | set(df_b_indexed.index.tolist()))
+                
             for chunk_idx in range(num_chunks):
                 start_idx = chunk_idx * chunk_size
                 end_idx = min((chunk_idx + 1) * chunk_size, total_rows)
@@ -213,9 +226,10 @@ class ComparisonEngine:
                     chunk_a = df_a_indexed.iloc[start_idx:end_idx]
                     chunk_b = df_b_indexed.iloc[start_idx:end_idx]
                 else:
-                    # For join keys, use positional indexing on the filtered dataframes
-                    chunk_a = df_a_indexed.iloc[start_idx:end_idx]
-                    chunk_b = df_b_indexed.iloc[start_idx:end_idx]
+                    # For join keys: chunk by key groups
+                    chunk_keys = all_keys[start_idx:end_idx]
+                    chunk_a = df_a_indexed[df_a_indexed.index.isin(chunk_keys)]
+                    chunk_b = df_b_indexed[df_b_indexed.index.isin(chunk_keys)]
                 
                 print(f"Chunk sizes: A={len(chunk_a)}, B={len(chunk_b)}")
                 
@@ -306,69 +320,52 @@ class ComparisonEngine:
         only_in_a = 0
         only_in_b = 0
         
-        # Get all indices from both chunks
-        try:
-            all_indices = set(df_a_chunk.index) | set(df_b_chunk.index)
-        except:
-            # Fallback if index operations fail
-            all_indices = set(range(max(len(df_a_chunk), len(df_b_chunk))))
+        # C: Rewrite _compare_chunk to use vectorized merge
+        # Copy and drop duplicates to avoid merge explosion
+        df_a_temp = df_a_chunk.copy()
+        df_b_temp = df_b_chunk.copy()
         
-        for idx in all_indices:
-            # Handle different index types safely
-            try:
-                in_a = idx in df_a_chunk.index
-                in_b = idx in df_b_chunk.index
-            except:
-                # Fallback to positional indexing
-                in_a = idx < len(df_a_chunk)
-                in_b = idx < len(df_b_chunk)
+        df_a_temp['_idx'] = df_a_temp.index
+        df_b_temp['_idx'] = df_b_temp.index
+        
+        df_a_temp = df_a_temp.drop_duplicates(subset=['_idx'])
+        df_b_temp = df_b_temp.drop_duplicates(subset=['_idx'])
+        
+        # Merge using outer join
+        merged = pd.merge(df_a_temp, df_b_temp, on='_idx', how='outer', indicator=True, suffixes=('_a', '_b'))
+        merged = merged.rename(columns={'_merge': 'merge_indicator'})
+        
+        def get_row_key(row_dict, in_a, in_b):
+            prefix = '_a' if in_a and not in_b else ('_b' if in_b and not in_a else '_a')
+            for id_col in ['ObjectId', 'SystemId', 'id', 'ID', 'name', 'Name']:
+                col_name = f"{id_col}{prefix}"
+                if col_name in row_dict and pd.notna(row_dict[col_name]):
+                    val = str(row_dict[col_name])
+                    if len(val) < 50:
+                        return val
+            idx_val = row_dict['_idx']
+            if isinstance(idx_val, tuple) and len(idx_val) > 0:
+                return str(idx_val[0]) if len(str(idx_val[0])) < 50 else f"row_{hash(str(idx_val)) % 10000}"
+            else:
+                return str(idx_val) if len(str(idx_val)) < 50 else f"row_{hash(str(idx_val)) % 10000}"
+
+        # Vectorized simple equality check for matched rows ('both')
+        # We can pre-calculate the simple equality mask for comparison columns
+        # To handle NaN == NaN in pandas, we use .equals or (a == b) | (a.isna() & b.isna())
+        
+        # Process the merged dataframe
+        for row_tuple in merged.itertuples(index=False):
+            row = row_tuple._asdict()
+            merge_status = row['merge_indicator']
             
-            if not in_a and not in_b:
-                continue
-            
-            # Convert index to string safely - use a readable identifier
-            try:
-                # Try to get a readable identifier from the row data
-                if in_a:
-                    row_data = df_a_chunk.loc[idx]
-                    # Look for common identifier columns
-                    for id_col in ['ObjectId', 'SystemId', 'id', 'ID', 'name', 'Name']:
-                        if id_col in row_data and pd.notna(row_data[id_col]):
-                            val = str(row_data[id_col])
-                            if len(val) < 50:  # Use if reasonably short
-                                row_key = val
-                                break
-                    else:
-                        # Fallback to index
-                        if isinstance(idx, tuple) and len(idx) > 0:
-                            row_key = str(idx[0]) if len(str(idx[0])) < 50 else f"row_{hash(str(idx)) % 10000}"
-                        else:
-                            row_key = str(idx) if len(str(idx)) < 50 else f"row_{hash(str(idx)) % 10000}"
-                else:
-                    # Same logic for row in B
-                    row_data = df_b_chunk.loc[idx]
-                    for id_col in ['ObjectId', 'SystemId', 'id', 'ID', 'name', 'Name']:
-                        if id_col in row_data and pd.notna(row_data[id_col]):
-                            val = str(row_data[id_col])
-                            if len(val) < 50:
-                                row_key = val
-                                break
-                    else:
-                        if isinstance(idx, tuple) and len(idx) > 0:
-                            row_key = str(idx[0]) if len(str(idx[0])) < 50 else f"row_{hash(str(idx)) % 10000}"
-                        else:
-                            row_key = str(idx) if len(str(idx)) < 50 else f"row_{hash(str(idx)) % 10000}"
-            except:
-                row_key = f"row_{hash(str(idx)) % 10000}"
-            
-            if in_a and not in_b:
+            if merge_status == 'left_only':
                 only_in_a += 1
-                # UI IMPROVEMENT: Include row data for rows only in A with JSON conversion (use all_display_columns)
+                row_key = get_row_key(row, True, False)
                 row_data = {}
                 for col in all_display_columns:
-                    if col in df_a_chunk.columns:
-                        val = df_a_chunk.loc[idx, col]
-                        row_data[col] = self._convert_to_json_format(val)
+                    col_a = f"{col}_a" if f"{col}_a" in row else col
+                    if col_a in row and pd.notna(row[col_a]):
+                        row_data[col] = self._convert_to_json_format(row[col_a])
                 results.append({
                     "row_key": row_key,
                     "status": "only_in_a",
@@ -376,14 +373,14 @@ class ComparisonEngine:
                     "row_data_a": row_data,
                     "row_data_b": None
                 })
-            elif in_b and not in_a:
+            elif merge_status == 'right_only':
                 only_in_b += 1
-                # UI IMPROVEMENT: Include row data for rows only in B with JSON conversion (use all_display_columns)
+                row_key = get_row_key(row, False, True)
                 row_data = {}
                 for col in all_display_columns:
-                    if col in df_b_chunk.columns:
-                        val = df_b_chunk.loc[idx, col]
-                        row_data[col] = self._convert_to_json_format(val)
+                    col_b = f"{col}_b" if f"{col}_b" in row else col
+                    if col_b in row and pd.notna(row[col_b]):
+                        row_data[col] = self._convert_to_json_format(row[col_b])
                 results.append({
                     "row_key": row_key,
                     "status": "only_in_b",
@@ -392,86 +389,71 @@ class ComparisonEngine:
                     "row_data_b": row_data
                 })
             else:
-                # Both exist - compare
-                try:
-                    row_a = df_a_chunk.loc[idx]
-                    row_b = df_b_chunk.loc[idx]
-                    
-                    # Handle case where loc returns DataFrame (multiple rows with same index)
-                    # This happens when using non-unique join keys like ObjectClass
-                    if isinstance(row_a, pd.DataFrame):
-                        row_a = row_a.iloc[0]  # Take first matching row
-                    if isinstance(row_b, pd.DataFrame):
-                        row_b = row_b.iloc[0]  # Take first matching row
-                except:
-                    # Fallback to positional access
-                    try:
-                        row_a = df_a_chunk.iloc[list(df_a_chunk.index).index(idx) if idx in df_a_chunk.index else 0]
-                        row_b = df_b_chunk.iloc[list(df_b_chunk.index).index(idx) if idx in df_b_chunk.index else 0]
-                    except:
-                        # Skip this row if we can't access it
-                        continue
-                
-                # UI IMPROVEMENT: Include row data for both files (use all_display_columns)
-                row_data_a = {}
-                row_data_b = {}
-                for col in all_display_columns:
-                    if col in row_a.index:
-                        val = row_a[col]
-                        # Ensure scalar value (handle pandas Series)
-                        val = ensure_scalar(val)
-                        # Convert tuple/list representation to JSON format
-                        converted_val = self._convert_to_json_format(val)
-                        row_data_a[col] = converted_val
-                    
-                    if col in row_b.index:
-                        val = row_b[col]
-                        # Ensure scalar value (handle pandas Series)
-                        val = ensure_scalar(val)
-                        # Convert tuple/list representation to JSON format
-                        converted_val = self._convert_to_json_format(val)
-                        row_data_b[col] = converted_val
-                
+                # 'both'
+                row_key = get_row_key(row, True, True)
                 differences = []
-                # UI IMPROVEMENT: Only compare using comparison_columns (not display_columns)
+                
+                # Apply keyword filter
+                if keyword_filter:
+                    found = False
+                    for col in comparison_columns:
+                        col_a = f"{col}_a" if f"{col}_a" in row else col
+                        col_b = f"{col}_b" if f"{col}_b" in row else col
+                        val_a_str = str(row[col_a]) if col_a in row and pd.notna(row[col_a]) else ""
+                        val_b_str = str(row[col_b]) if col_b in row and pd.notna(row[col_b]) else ""
+                        if keyword_filter in val_a_str and keyword_filter in val_b_str:
+                            found = True
+                            break
+                    if not found:
+                        continue
+                
                 for col in comparison_columns:
-                    if col not in row_a or col not in row_b:
+                    col_a = f"{col}_a" if f"{col}_a" in row else col
+                    col_b = f"{col}_b" if f"{col}_b" in row else col
+                    
+                    if col_a not in row or col_b not in row:
+                        continue
+                        
+                    val_a = row[col_a]
+                    val_b = row[col_b]
+                    
+                    is_na_a = (isinstance(val_a, float) and pd.isna(val_a)) or val_a is None
+                    is_na_b = (isinstance(val_b, float) and pd.isna(val_b)) or val_b is None
+                    
+                    if is_na_a and is_na_b:
                         continue
                     
-                    val_a = row_a[col]
-                    val_b = row_b[col]
-                    
-                    # Ensure scalar values (handle pandas Series from duplicate indices)
-                    val_a = ensure_scalar(val_a)
-                    val_b = ensure_scalar(val_b)
-                    
-                    # Apply keyword filter if specified
-                    if keyword_filter:
-                        val_a_str = str(val_a) if val_a is not None else ""
-                        val_b_str = str(val_b) if val_b is not None else ""
+                    # 3. Simple equality check first
+                    if val_a == val_b:
+                        continue
                         
-                        # Only compare if keyword exists in both values
-                        if keyword_filter not in val_a_str or keyword_filter not in val_b_str:
-                            continue  # Skip this column comparison for this row
+                    # 4. Only run expensive JSON comparison on rows that fail simple equality
+                    norm_a = normalize_value(val_a)
+                    norm_b = normalize_value(val_b)
                     
-                    # Use flexible JSON comparison that ignores key order and extra fields
-                    if not compare_json_objects(val_a, val_b):
-                        # Get detailed differences for JSON objects
-                        json_diffs = get_json_differences(val_a, val_b)
-                        
-                        # Only add as difference if there are actual value differences
-                        # (not just extra fields)
-                        actual_value_diffs = [d for d in json_diffs if "differs" in d or "Values differ" in d]
-                        if actual_value_diffs:
+                    if not compare_json_objects(norm_a, norm_b, _is_normalized=True):
+                        json_diffs = get_json_differences(norm_a, norm_b, _is_normalized=True)
+                        actual_diffs = [d for d in json_diffs if "differs" in d or "Values differ" in d]
+                        if actual_diffs:
                             differences.append({
                                 "column": col,
-                                "value_a": str(val_a) if val_a is not None else "null",
-                                "value_b": str(val_b) if val_b is not None else "null",
+                                "value_a": str(val_a) if not is_na_a else "null",
+                                "value_b": str(val_b) if not is_na_b else "null",
                                 "diff_keys": json_diffs
                             })
                 
                 if differences:
                     mismatching += 1
+                    row_data_a = {}
+                    row_data_b = {}
+                    for col in all_display_columns:
+                        col_a = f"{col}_a" if f"{col}_a" in row else col
+                        col_b = f"{col}_b" if f"{col}_b" in row else col
+                        if col_a in row and pd.notna(row[col_a]):
+                            row_data_a[col] = self._convert_to_json_format(row[col_a])
+                        if col_b in row and pd.notna(row[col_b]):
+                            row_data_b[col] = self._convert_to_json_format(row[col_b])
+                            
                     results.append({
                         "row_key": row_key,
                         "status": "mismatch",
@@ -481,12 +463,13 @@ class ComparisonEngine:
                     })
                 else:
                     matching += 1
+                    # G. Don't return full row data for matching rows
                     results.append({
                         "row_key": row_key,
                         "status": "match",
                         "differences": [],
-                        "row_data_a": row_data_a,
-                        "row_data_b": row_data_b
+                        "row_data_a": {},
+                        "row_data_b": {}
                     })
         
         stats = {
@@ -519,38 +502,19 @@ class ComparisonEngine:
     def _convert_to_json_format(self, value) -> str:
         """Convert tuple/list representation to JSON format."""
         import json
-        import ast
-        
-        if value is None:
+        if value is None or (isinstance(value, float) and pd.isna(value)):
             return "null"
-        
-        # Convert to string first
+        if isinstance(value, dict):
+            return json.dumps(value, indent=2, default=str)
+        if isinstance(value, (list, tuple)):
+            return json.dumps(value, indent=2, default=str)
         val_str = str(value)
-        
-        # Try to parse as tuple/list representation
-        if val_str.startswith('[') and val_str.endswith(']'):
-            try:
-                parsed = ast.literal_eval(val_str)
-                if isinstance(parsed, (list, tuple)):
-                    # Convert to dict if it's a list of tuples
-                    if all(isinstance(item, tuple) and len(item) == 2 for item in parsed):
-                        result_dict = dict(parsed)
-                        return json.dumps(result_dict, indent=2, default=str)
-                    else:
-                        return json.dumps(parsed, indent=2, default=str)
-            except:
-                pass
-        
-        # Try to parse as dict representation
-        if val_str.startswith('{') and val_str.endswith('}'):
-            try:
-                parsed = ast.literal_eval(val_str)
-                if isinstance(parsed, dict):
-                    return json.dumps(parsed, indent=2, default=str)
-            except:
-                pass
-        
-        # Return as-is if no conversion needed
+        try:
+            parsed = json.loads(val_str)
+            if isinstance(parsed, (dict, list)):
+                return json.dumps(parsed, indent=2, default=str)
+        except (json.JSONDecodeError, ValueError):
+            pass
         return val_str
     
     def _compare_content_based(
@@ -575,7 +539,7 @@ class ComparisonEngine:
             """Create a hash key from row values for the specified columns."""
             hash_parts = []
             for col in cols:
-                if col in row.index:
+                if col in row:
                     val = ensure_scalar(row[col])
                     # Normalize the value for consistent hashing
                     normalized = normalize_value(val)
@@ -588,21 +552,21 @@ class ComparisonEngine:
         b_content_map = {}  # hash -> (idx, row)
         b_matched_hashes = set()
         
-        for idx_b in range(len(df_b)):
-            row_b = df_b.iloc[idx_b]
+        for idx_b, row_tuple in enumerate(df_b.itertuples(index=False)):
+            row_b = row_tuple._asdict()
             hash_key = create_content_hash(row_b, columns)
             if hash_key not in b_content_map:  # First match only
                 b_content_map[hash_key] = (idx_b, row_b)
         
         # Match rows from File A
         a_matched_hashes = set()
-        for idx_a in range(len(df_a)):
-            row_a = df_a.iloc[idx_a]
+        for idx_a, row_tuple in enumerate(df_a.itertuples(index=False)):
+            row_a = row_tuple._asdict()
             hash_key = create_content_hash(row_a, columns)
             
             # Apply keyword filter if specified
             if keyword_filter:
-                row_str = ' '.join(str(row_a[col]) for col in columns if col in row_a.index)
+                row_str = ' '.join(str(row_a[col]) for col in columns if col in row_a)
                 if keyword_filter not in row_str:
                     continue
             
@@ -614,23 +578,13 @@ class ComparisonEngine:
                 # Rows match based on content
                 matching += 1
                 
-                # UI IMPROVEMENT: Build row data (use all_display_columns)
-                row_data_a = {}
-                row_data_b = {}
-                for col in all_display_columns:
-                    if col in row_a.index:
-                        val = ensure_scalar(row_a[col])
-                        row_data_a[col] = self._convert_to_json_format(val)
-                    if col in row_b.index:
-                        val = ensure_scalar(row_b[col])
-                        row_data_b[col] = self._convert_to_json_format(val)
-                
+                # UI IMPROVEMENT: Don't return full row data for matched
                 results.append({
                     "row_key": f"row_{idx_a}",
                     "status": "match",
                     "differences": [],
-                    "row_data_a": row_data_a,
-                    "row_data_b": row_data_b
+                    "row_data_a": {},
+                    "row_data_b": {}
                 })
             else:
                 # Row only in A (no matching content in B)
@@ -639,7 +593,7 @@ class ComparisonEngine:
                 # UI IMPROVEMENT: Build row data (use all_display_columns)
                 row_data_a = {}
                 for col in all_display_columns:
-                    if col in row_a.index:
+                    if col in row_a:
                         val = ensure_scalar(row_a[col])
                         row_data_a[col] = self._convert_to_json_format(val)
                 
@@ -656,7 +610,7 @@ class ComparisonEngine:
             if hash_key not in b_matched_hashes:
                 # Apply keyword filter if specified
                 if keyword_filter:
-                    row_str = ' '.join(str(row_b[col]) for col in columns if col in row_b.index)
+                    row_str = ' '.join(str(row_b[col]) for col in columns if col in row_b)
                     if keyword_filter not in row_str:
                         continue
                 
@@ -665,7 +619,7 @@ class ComparisonEngine:
                 # UI IMPROVEMENT: Build row data (use all_display_columns)
                 row_data_b = {}
                 for col in all_display_columns:
-                    if col in row_b.index:
+                    if col in row_b:
                         val = ensure_scalar(row_b[col])
                         row_data_b[col] = self._convert_to_json_format(val)
                 

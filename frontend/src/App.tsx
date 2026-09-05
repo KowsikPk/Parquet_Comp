@@ -13,13 +13,16 @@ import ResultsTable from './components/ResultsTable';
 import ExportDropdown from './components/ExportDropdown';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import ResultsFilterPanel from './components/ResultsFilterPanel';
+import EmptyState from './components/EmptyState';
+import GlobalLoading from './components/GlobalLoading';
 import { uploadFiles, compareFiles, getJobStatus, getJobResult, downloadReport, loadSampleFiles } from './services/api';
 import type { CompareResponse, JobStatus, ColumnFilter } from './types';
 
 const App: React.FC = () => {
-  // Dark mode state
+  // Dark mode state - default to true for modern dark experience
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('parquet-compare-theme') === 'dark';
+    const saved = localStorage.getItem('parquet-compare-theme');
+    return saved ? saved === 'dark' : true;
   });
 
   // Step management
@@ -33,7 +36,7 @@ const App: React.FC = () => {
   const [compareAll, setCompareAll] = useState(false);
   const [selectedJoinKeys, setSelectedJoinKeys] = useState<string[]>([]);
   const [matchingStrategy, setMatchingStrategy] = useState<'join_keys' | 'content_based'>('content_based');
-  const [displayColumns, setDisplayColumns] = useState<string[]>([]);  // UI IMPROVEMENT: Display-only columns
+  const [displayColumns, setDisplayColumns] = useState<string[]>([]);
   const [fileAFilters, setFileAFilters] = useState<ColumnFilter[]>([]);
   const [fileBFilters, setFileBFilters] = useState<ColumnFilter[]>([]);
   const [comparisonResult, setComparisonResult] = useState<CompareResponse | null>(null);
@@ -90,21 +93,10 @@ const App: React.FC = () => {
             break;
           case 'f':
             e.preventDefault();
-            // Focus search input if in results step
             if (currentStep === 3) {
-              const searchInput = document.querySelector('input[placeholder="Search by row key or value…"]');
-              if (searchInput) (searchInput as HTMLInputElement).focus();
+              const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+              if (searchInput) searchInput.focus();
             }
-            break;
-        }
-      } else {
-        switch (e.key) {
-          case 'ArrowUp':
-          case 'ArrowDown':
-            // Navigate expanded rows (implement if needed)
-            break;
-          case ' ':
-            // Expand/collapse focused row (implement if needed)
             break;
         }
       }
@@ -136,7 +128,7 @@ const App: React.FC = () => {
 
   const handleUpload = async () => {
     if (!fileA || !fileB) {
-      setError('Please select both files');
+      setError('Please select both files to continue comparison');
       return;
     }
 
@@ -147,13 +139,12 @@ const App: React.FC = () => {
       const response = await uploadFiles(fileA, fileB);
       setUploadResponse(response);
       
-      // Initialize column selection with all common columns
-      const commonColumns = response.file_a_metadata.columns.filter(
+      const commonCols = response.file_a_metadata.columns.filter(
         (col: string) => response.file_b_metadata.columns.includes(col)
       );
-      setSelectedColumns(commonColumns);
+      setSelectedColumns(commonCols);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Upload failed');
+      setError(err.response?.data?.detail || 'File upload failed');
     } finally {
       setIsComparing(false);
     }
@@ -170,7 +161,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Only require join keys for join_keys strategy
     if (matchingStrategy === 'join_keys' && selectedJoinKeys.length === 0) {
       setError('Please select at least one join key column');
       return;
@@ -179,84 +169,67 @@ const App: React.FC = () => {
     setIsComparing(true);
     setError(null);
     setProgress(0);
-    setComparisonResult(null); // Clear previous results
+    setComparisonResult(null);
 
     try {
       const request = {
         file_a_id: uploadResponse.file_a_id,
         file_b_id: uploadResponse.file_b_id,
         columns: compareAll ? null : selectedColumns,
-        display_columns: displayColumns.length > 0 ? displayColumns : null,  // UI IMPROVEMENT: Display-only columns
+        display_columns: displayColumns.length > 0 ? displayColumns : null,
         join_keys: matchingStrategy === 'join_keys' ? selectedJoinKeys : null,
-        keyword_filter: null,  // Disabled in favor of advanced filters
+        keyword_filter: null,
         file_a_filters: fileAFilters.length > 0 ? fileAFilters : null,
         file_b_filters: fileBFilters.length > 0 ? fileBFilters : null,
         matching_strategy: matchingStrategy
       };
 
-      console.log('Sending compare request:', JSON.stringify(request, null, 2));
       const response = await compareFiles(request);
-      console.log('Compare response:', response);
 
       if (response.job_id) {
-        // Async comparison - poll for status
-        console.log('Starting async comparison with job_id:', response.job_id);
+        // pollJobStatus handles setIsComparing(false) on completion/failure
         pollJobStatus(response.job_id);
       } else {
-        // Sync comparison - immediate result
-        console.log('Sync comparison, immediate result');
         setComparisonResult(response);
         setProgress(100);
+        setIsComparing(false);
       }
     } catch (err: any) {
-      console.error('Comparison error:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Comparison failed';
-      setError(errorMessage);
+      setError(err.response?.data?.detail || err.message || 'Comparison execution failed');
       setProgress(0);
-    } finally {
       setIsComparing(false);
     }
   };
 
   const pollJobStatus = async (jobId: string) => {
-    console.log('Starting to poll job:', jobId);
     const pollInterval = setInterval(async () => {
       try {
         const status: JobStatus = await getJobStatus(jobId);
-        console.log('Job status:', status);
         setProgress(status.progress);
 
         if (status.status === 'completed') {
-          console.log('Job completed, fetching result');
           clearInterval(pollInterval);
           try {
             const result = await getJobResult(jobId);
-            console.log('Job result received:', result);
-            
             if (result && result.summary) {
-              console.log('Setting comparison result');
               setComparisonResult(result);
               setIsComparing(false);
             } else {
-              console.error('Invalid result format:', result);
-              setError('Invalid result format received from server');
+              setError('Invalid result response from backend server');
               setIsComparing(false);
             }
           } catch (err: any) {
-            console.error('Error fetching job result:', err);
-            setError(err.response?.data?.detail || 'Failed to get job result');
+            setError(err.response?.data?.detail || 'Failed to retrieve comparison result');
             setIsComparing(false);
           }
         } else if (status.status === 'failed') {
-          console.log('Job failed');
           clearInterval(pollInterval);
-          setError(status.error || 'Comparison failed');
+          setError(status.error || 'Comparison execution failed');
           setIsComparing(false);
         }
       } catch (err: any) {
-        console.error('Error polling job status:', err);
         clearInterval(pollInterval);
-        setError(err.response?.data?.detail || 'Failed to get job status');
+        setError(err.response?.data?.detail || 'Failed to poll job status');
         setIsComparing(false);
       }
     }, 1000);
@@ -264,7 +237,6 @@ const App: React.FC = () => {
 
   const handleDownloadReport = async () => {
     if (!comparisonResult?.job_id) return;
-
     try {
       await downloadReport(comparisonResult.job_id);
     } catch (err: any) {
@@ -280,21 +252,18 @@ const App: React.FC = () => {
       const response = await loadSampleFiles();
       setUploadResponse(response);
       
-      // Initialize column selection with all common columns
-      const commonColumns = response.file_a_metadata.columns.filter(
+      const commonCols = response.file_a_metadata.columns.filter(
         (col: string) => response.file_b_metadata.columns.includes(col)
       );
-      setSelectedColumns(commonColumns);
+      setSelectedColumns(commonCols);
       
-      // Set file names for display
       setFileA(new File([], "sample_a.parquet"));
       setFileB(new File([], "sample_b.parquet"));
       
-      // Clear filters
       setFileAFilters([]);
       setFileBFilters([]);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load sample files');
+      setError(err.response?.data?.detail || 'Failed to load sample dataset');
     } finally {
       setIsComparing(false);
     }
@@ -306,17 +275,15 @@ const App: React.FC = () => {
       )
     : [];
 
-  // Helper variables for display filenames throughout the flow
   const fileADisplayName = uploadResponse?.file_a_metadata?.original_filename || fileA?.name || 'File A';
   const fileBDisplayName = uploadResponse?.file_b_metadata?.original_filename || fileB?.name || 'File B';
 
   return (
-    <div className="min-h-screen max-w-full bg-gray-100 dark:bg-[#0F1117] flex flex-col overflow-x-hidden">
-      {/* Top Navigation */}
+    <div className="min-h-screen w-full bg-theme-base text-theme-text flex flex-col overflow-x-hidden font-sans">
+      {isComparing && <GlobalLoading message="Computing Deep Column Diffs..." progress={progress} />}
       <TopNav onThemeToggle={toggleDarkMode} isDarkMode={isDarkMode} />
 
       <div className="flex flex-1 overflow-hidden min-w-0">
-        {/* Left Sidebar */}
         <LeftSidebar
           currentStep={currentStep}
           onStepChange={setCurrentStep}
@@ -324,57 +291,105 @@ const App: React.FC = () => {
           hasResults={!!comparisonResult}
         />
 
-        {/* Main Content */}
         <MainContent>
-          {/* Step Indicator */}
           <StepIndicator currentStep={currentStep} />
 
-          {/* Error Display */}
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-6">
-              {error}
+            <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl mb-6 flex items-center justify-between text-xs font-medium animate-fade-in shadow-lg">
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>{error}</span>
+              </div>
+              <button onClick={() => setError(null)} className="text-red-400 hover:text-white">✕</button>
             </div>
           )}
 
           {/* Step 1: File Upload */}
           <StepContainer step={1} currentStep={currentStep}>
-            <div className="bg-white dark:bg-[#1A1D27] rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-[#F1F5F9]">Upload Files</h2>
-                <button
-                  onClick={handleLoadSamples}
-                  className="px-4 py-2 bg-gray-500 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-500 text-sm"
-                >
-                  Load Basic Sample
-                </button>
-              </div>
-              
-              <div className="flex space-x-4 mb-4">
-                <FileUpload
-                  label="File A"
-                  onFileSelect={handleFileASelect}
-                  selectedFile={fileA}
-                  disabled={isComparing}
-                  metadata={uploadResponse?.file_a_metadata}
-                  onRemove={handleFileARemove}
-                />
-                <FileUpload
-                  label="File B"
-                  onFileSelect={handleFileBSelect}
-                  selectedFile={fileB}
-                  disabled={isComparing}
-                  metadata={uploadResponse?.file_b_metadata}
-                  onRemove={handleFileBRemove}
-                />
+            <div className="space-y-6">
+              {/* Hero Banner */}
+              <div className="text-center py-6 space-y-2">
+                <h2 className="text-2xl md:text-3xl font-extrabold text-theme-text tracking-tight">
+                  Compare Parquet Datasets with Precision
+                </h2>
+                <p className="text-xs md:text-sm text-theme-text-secondary max-w-xl mx-auto">
+                  Deep JSON attribute inspection, key-based or content-based row matching, and diff reports.
+                </p>
               </div>
 
-              <button
-                onClick={handleUpload}
-                disabled={!fileA || !fileB || isComparing}
-                className="w-full px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-500 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
-              >
-                {isComparing ? 'Uploading...' : 'Upload Files'}
-              </button>
+              {/* Upload Card Grid */}
+              <div className="bg-theme-surface border border-theme-border rounded-2xl p-6 shadow-2xl relative space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                    <span className="text-sm font-bold text-theme-text">Upload Input Datasets</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLoadSamples}
+                    className="px-3 py-1.5 bg-theme-elevated hover:bg-theme-muted text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Load Demo Dataset</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                  <FileUpload
+                    label="File A (Base)"
+                    onFileSelect={handleFileASelect}
+                    selectedFile={fileA}
+                    disabled={isComparing}
+                    metadata={uploadResponse?.file_a_metadata}
+                    onRemove={handleFileARemove}
+                    accentColor="indigo"
+                  />
+
+                  {/* VS Badge */}
+                  <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-theme-elevated border border-theme-border items-center justify-center text-xs font-black font-mono text-blue-400 shadow-xl z-10">
+                    VS
+                  </div>
+
+                  <FileUpload
+                    label="File B (Target)"
+                    onFileSelect={handleFileBSelect}
+                    selectedFile={fileB}
+                    disabled={isComparing}
+                    metadata={uploadResponse?.file_b_metadata}
+                    onRemove={handleFileBRemove}
+                    accentColor="violet"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleUpload}
+                  disabled={!fileA || !fileB || isComparing}
+                  className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 disabled:from-theme-elevated disabled:to-theme-elevated disabled:text-theme-text-muted text-white font-bold rounded-xl shadow-lg shadow-blue-500/25 transition-all text-sm flex items-center justify-center space-x-2"
+                >
+                  {isComparing ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span>Analyzing File Metadata...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Inspect Schema & Continue</span>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </StepContainer>
 
@@ -382,7 +397,6 @@ const App: React.FC = () => {
           <StepContainer step={2} currentStep={currentStep}>
             {uploadResponse ? (
               <div className="space-y-6">
-                {/* Column Selection */}
                 <ColumnSelector
                   columnsA={uploadResponse.file_a_metadata.columns}
                   columnsB={uploadResponse.file_b_metadata.columns}
@@ -398,13 +412,12 @@ const App: React.FC = () => {
                   onClearAll={() => setSelectedColumns([])}
                   compareAll={compareAll}
                   onCompareAllChange={setCompareAll}
-                  displayColumns={displayColumns}  // UI IMPROVEMENT: Display-only columns
-                  onDisplayColumnChange={setDisplayColumns}  // UI IMPROVEMENT: Display column change handler
+                  displayColumns={displayColumns}
+                  onDisplayColumnChange={setDisplayColumns}
                   fileAName={fileADisplayName}
                   fileBName={fileBDisplayName}
                 />
 
-                {/* Join Key Selection */}
                 <JoinKeySelector
                   commonColumns={commonColumns}
                   selectedJoinKeys={selectedJoinKeys}
@@ -419,13 +432,12 @@ const App: React.FC = () => {
                   onMatchingStrategyChange={setMatchingStrategy}
                 />
 
-                {/* UI IMPROVEMENT #10: Advanced Row Filters with color */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <AdvancedFilter
                     columns={uploadResponse.file_a_metadata.columns}
                     filters={fileAFilters}
                     onFiltersChange={setFileAFilters}
-                    label={`${fileADisplayName} Row Filters`}
+                    label={`${fileADisplayName} Filters`}
                     disabled={isComparing}
                     fileId={uploadResponse.file_a_id}
                     copyFromFilters={fileBFilters}
@@ -436,7 +448,7 @@ const App: React.FC = () => {
                     columns={uploadResponse.file_b_metadata.columns}
                     filters={fileBFilters}
                     onFiltersChange={setFileBFilters}
-                    label={`${fileBDisplayName} Row Filters`}
+                    label={`${fileBDisplayName} Filters`}
                     disabled={isComparing}
                     fileId={uploadResponse.file_b_id}
                     copyFromFilters={fileAFilters}
@@ -445,74 +457,58 @@ const App: React.FC = () => {
                   />
                 </div>
 
-                {/* UI IMPROVEMENT #11: Compare Button with icons */}
-                <div>
+                {/* Compare Action Section */}
+                <div className="space-y-3">
                   <button
+                    type="button"
                     onClick={handleCompare}
                     disabled={isComparing || (!compareAll && selectedColumns.length === 0)}
-                    className="w-full px-4 py-3 bg-green-500 dark:bg-green-600 text-white rounded-lg hover:bg-green-600 dark:hover:bg-green-500 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed font-medium flex items-center justify-center transition-all"
-                    style={{minWidth: '80px'}}
-                    title={!compareAll && selectedColumns.length === 0 ? 'Select at least one column to compare' : ''}
+                    className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-theme-elevated disabled:to-theme-elevated disabled:text-theme-text-muted text-white font-extrabold rounded-xl shadow-xl shadow-emerald-500/20 transition-all text-sm flex items-center justify-center space-x-2"
                   >
                     {isComparing ? (
                       <>
-                        {/* UI IMPROVEMENT #11: SPINNER icon for loading state */}
-                        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 animate-spin" style={{fontSize: '1.125rem'}}>
-                          <line x1="12" y1="2" x2="12" y2="6"/>
-                          <line x1="12" y1="18" x2="12" y2="22"/>
-                          <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
-                          <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-                          <line x1="2" y1="12" x2="6" y2="12"/>
-                          <line x1="18" y1="12" x2="22" y2="12"/>
-                          <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
-                          <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+                        <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
-                        Comparing...
+                        <span>Computing Deep Column Diffs...</span>
                       </>
                     ) : (
                       <>
-                        {/* UI IMPROVEMENT #11: REFRESH icon for enabled state */}
-                        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{fontSize: '1.125rem'}}>
-                          <polyline points="1 4 1 10 7 10"/>
-                          <polyline points="23 20 23 14 17 14"/>
-                          <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         </svg>
-                        Compare Files
+                        <span>Execute Parquet Diff Engine</span>
                       </>
                     )}
                   </button>
 
-                  {/* Progress Bar */}
                   {isComparing && (
-                    <div className="mt-4 bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-                      <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        <span className="font-medium">Processing comparison...</span>
-                        <span className="font-mono">{progress > 0 ? `${progress}%` : 'Initializing...'}</span>
+                    <div className="bg-theme-surface border border-theme-border rounded-xl p-4 space-y-2">
+                      <div className="flex justify-between text-xs text-theme-text-secondary">
+                        <span className="font-semibold">Processing row evaluation...</span>
+                        <span className="font-mono text-blue-400 font-bold">{progress}%</span>
                       </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-2">
+                      <div className="w-full bg-theme-elevated rounded-full h-2 overflow-hidden border border-theme-border">
                         <div
-                          className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 h-3 rounded-full transition-all duration-300"
+                          className="bg-gradient-to-r from-blue-500 to-emerald-500 h-full transition-all duration-300"
                           style={{ width: `${progress}%` }}
-                        ></div>
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-500 flex items-center space-x-2">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>
-                          {progress === 0 && 'Preparing data...'}
-                          {progress > 0 && progress < 100 && 'Comparing rows...'}
-                          {progress === 100 && 'Finalizing results...'}
-                        </span>
+                        />
                       </div>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">Please upload files first to configure comparison settings</p>
-              </div>
+              <EmptyState
+                icon="upload"
+                title="No Datasets Loaded"
+                description="Please select and upload base and target Parquet files to configure comparison parameters."
+                action={{
+                  label: "Go to File Upload",
+                  onClick: () => setCurrentStep(1)
+                }}
+              />
             )}
           </StepContainer>
 
@@ -522,7 +518,6 @@ const App: React.FC = () => {
               <LoadingSkeleton />
             ) : comparisonResult && comparisonResult.summary ? (
               <div className="space-y-6">
-                {/* Editable Filter Panel */}
                 {uploadResponse && (
                   <ResultsFilterPanel
                     columnsA={uploadResponse.file_a_metadata.columns}
@@ -550,7 +545,7 @@ const App: React.FC = () => {
                 />
 
                 <div className="flex justify-end">
-                  <ExportDropdown 
+                  <ExportDropdown
                     comparisonResult={comparisonResult}
                     onDownloadReport={handleDownloadReport}
                     fileAName={fileADisplayName}
@@ -563,12 +558,22 @@ const App: React.FC = () => {
                   filter={filter}
                   onFilterChange={setFilter}
                   columnsCompared={comparisonResult.columns_compared}
-                  displayColumns={displayColumns}  // UI IMPROVEMENT: Display-only columns
+                  displayColumns={displayColumns}
                   fileAName={fileADisplayName}
                   fileBName={fileBDisplayName}
                 />
               </div>
-            ) : null}
+            ) : (
+              <EmptyState
+                icon="database"
+                title="No Comparison Results"
+                description="Run the comparison engine in Step 2 to generate deep diffs and inspect results."
+                action={{
+                  label: "Go to Configure",
+                  onClick: () => setCurrentStep(2)
+                }}
+              />
+            )}
           </StepContainer>
         </MainContent>
       </div>

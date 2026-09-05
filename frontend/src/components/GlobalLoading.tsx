@@ -5,37 +5,31 @@ interface GlobalLoadingProps {
   progress?: number;
 }
 
-const GlobalLoading: React.FC<GlobalLoadingProps> = ({ message = 'Loading...', progress }) => {
+const GlobalLoading: React.FC<GlobalLoadingProps> = ({ message = 'Processing...', progress }) => {
   return (
-    <div className="fixed inset-0 bg-white/80 dark:bg-[#0F1117]/80 backdrop-blur-sm flex items-center justify-center z-[9999]">
-      <div className="bg-white dark:bg-[#1A1D27] rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 border border-gray-200 dark:border-gray-700">
-        {/* UI IMPROVEMENT #27: SPINNER icon */}
-        <div className="flex justify-center mb-4">
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-blue-500" style={{fontSize: '3rem'}}>
-            <line x1="12" y1="2" x2="12" y2="6"/>
-            <line x1="12" y1="18" x2="12" y2="22"/>
-            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
-            <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
-            <line x1="2" y1="12" x2="6" y2="12"/>
-            <line x1="18" y1="12" x2="22" y2="12"/>
-            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
-            <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+    <div className="fixed inset-0 bg-theme-base/80 backdrop-blur-md flex items-center justify-center z-[9999] animate-fade-in">
+      <div className="bg-theme-surface border border-theme-border rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center space-y-4">
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+          <svg className="animate-spin h-8 w-8 text-blue-400" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-[#F1F5F9] text-center mb-2" style={{fontSize: '1.125rem'}}>
-          {message}
-        </h3>
+
+        <div>
+          <h3 className="text-base font-bold text-theme-text">{message}</h3>
+          <p className="text-xs text-theme-text-secondary mt-1">Please wait while the comparison engine runs</p>
+        </div>
+
         {progress !== undefined && (
-          <div className="mt-4">
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div className="space-y-2">
+            <div className="w-full bg-theme-elevated border border-theme-border rounded-full h-2 overflow-hidden">
               <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                className="bg-gradient-to-r from-blue-500 to-sky-500 h-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="text-center text-sm text-gray-500 dark:text-gray-400 mt-2" style={{fontSize: '0.875rem'}}>
-              {progress}%
-            </div>
+            <div className="text-xs font-mono text-blue-400 font-bold">{progress}%</div>
           </div>
         )}
       </div>

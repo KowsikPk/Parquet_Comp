@@ -5,43 +5,55 @@ interface InlineDiffViewProps {
   result: ComparisonResult;
   fileAName?: string;
   fileBName?: string;
-  displayColumns?: string[];  // UI IMPROVEMENT: Display-only columns
+  displayColumns?: string[];
 }
 
-const InlineDiffView: React.FC<InlineDiffViewProps> = ({ result, fileAName = 'File A', fileBName = 'File B', displayColumns = [] }) => {
-  // UI IMPROVEMENT: Diff detection logic
+const InlineDiffView: React.FC<InlineDiffViewProps> = ({
+  result,
+  fileAName = 'File A',
+  fileBName = 'File B',
+  displayColumns = []
+}) => {
   const getDiffKeys = (propsA: any, propsB: any) => {
     if (!propsA || !propsB) return [];
     const keysA = Object.keys(propsA);
     return keysA.filter(k => JSON.stringify(propsA[k]) !== JSON.stringify(propsB[k]));
   };
 
-  // UI IMPROVEMENT: Parse properties JSON
-  const parseProperties = (value: string) => {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return null;
+  const parseProperties = (value: any) => {
+    if (!value) return null;
+    
+    // If it's already an object/array, format it
+    let parsed = value;
+    if (typeof value === 'string') {
+      try {
+        parsed = JSON.parse(value);
+      } catch {
+        return null;
+      }
     }
+    
+    // Handle Parquet MAP types which become arrays of [key, value] tuples
+    if (Array.isArray(parsed)) {
+      const obj: Record<string, any> = {};
+      parsed.forEach(item => {
+        if (Array.isArray(item) && item.length >= 2) {
+          obj[item[0]] = item[1];
+        } else if (typeof item === 'object' && item !== null && 'key' in item && 'value' in item) {
+          obj[item.key] = item.value;
+        }
+      });
+      return Object.keys(obj).length > 0 ? obj : parsed;
+    }
+    
+    return parsed;
   };
 
-  // UI IMPROVEMENT: Format value with syntax highlighting
   const formatValue = (value: any): string => {
-    if (typeof value === 'string') {
-      return value;
-    }
+    if (typeof value === 'string') return value;
     return JSON.stringify(value);
   };
 
-  // UI IMPROVEMENT: Get value type for syntax highlighting
-  const getValueType = (value: any): 'string' | 'number' | 'boolean' | 'object' => {
-    if (typeof value === 'string') return 'string';
-    if (typeof value === 'number') return 'number';
-    if (typeof value === 'boolean') return 'boolean';
-    return 'object';
-  };
-
-  // UI IMPROVEMENT: Get display columns data
   const getDisplayColumnData = (rowData: any) => {
     if (!rowData) return [];
     return displayColumns.map(col => ({
@@ -50,18 +62,9 @@ const InlineDiffView: React.FC<InlineDiffViewProps> = ({ result, fileAName = 'Fi
     })).filter(item => item.value !== undefined);
   };
 
-  // UI IMPROVEMENT: Get properties data
   const getPropertiesData = (rowData: any) => {
-    if (!rowData) return null;
-    const propsValue = rowData['properties'];
-    if (!propsValue) return null;
-    return parseProperties(propsValue);
-  };
-
-  // UI IMPROVEMENT: Get ObjectClass data
-  const getObjectClass = (rowData: any) => {
-    if (!rowData) return null;
-    return rowData['ObjectClass'];
+    if (!rowData || !rowData['properties']) return null;
+    return parseProperties(rowData['properties']);
   };
 
   const propsA = getPropertiesData(result.row_data_a);
@@ -71,144 +74,110 @@ const InlineDiffView: React.FC<InlineDiffViewProps> = ({ result, fileAName = 'Fi
   const displayDataA = getDisplayColumnData(result.row_data_a);
   const displayDataB = getDisplayColumnData(result.row_data_b);
 
-  const objectClassA = getObjectClass(result.row_data_a);
-  const objectClassB = getObjectClass(result.row_data_b);
-
-  // UI IMPROVEMENT: Render properties with syntax highlighting
   const renderProperties = (props: any, diffKeys: string[], isFileA: boolean) => {
-    if (!props) return null;
+    if (!props) return <div className="text-theme-text-muted italic text-xs">No properties</div>;
 
     return (
-      <div className="diff-panel" style={{fontFamily: "'SF Mono', 'Consolas', monospace", fontSize: '0.8rem', lineHeight: 1.7, color: '#374151', maxHeight: '320px', overflowY: 'auto'}}>
-        <div>properties: {'{'}</div>
+      <div className="font-mono text-xs leading-relaxed max-h-72 overflow-y-auto pr-1 space-y-1">
+        <div className="text-theme-text-muted">properties: {'{'}</div>
         {Object.entries(props).map(([key, value]) => {
           const isDiff = diffKeys.includes(key);
-          const valueType = getValueType(value);
-          const valueColor = valueType === 'string' ? '#2563eb' : valueType === 'number' ? '#059669' : '#374151';
-          const bgColor = isDiff ? (isFileA ? '#fef2f2' : '#f0fdf4') : 'transparent';
-          const fontWeight = isDiff ? 700 : 400;
-
           return (
-            <div key={key} style={{paddingLeft: '1rem', backgroundColor: bgColor, fontWeight: fontWeight}}>
-              <span style={{color: '#374151'}}>{key}:</span>
-              <span style={{color: valueColor}}>{formatValue(value)}</span>
-              {isDiff && <span style={{color: '#9ca3af', marginLeft: '4px'}}>Δ</span>}
+            <div
+              key={key}
+              className={`pl-4 py-0.5 rounded flex items-center justify-between ${
+                isDiff
+                  ? isFileA
+                    ? 'bg-amber-500/10 text-amber-300 font-bold border-l-2 border-amber-500'
+                    : 'bg-sky-500/10 text-sky-300 font-bold border-l-2 border-sky-500'
+                  : 'text-theme-text-secondary'
+              }`}
+            >
+              <div className="truncate">
+                <span className="text-theme-text-secondary">{key}: </span>
+                <span className={isDiff ? (isFileA ? 'text-amber-200' : 'text-sky-200') : 'text-emerald-400'}>
+                  "{formatValue(value)}"
+                </span>
+              </div>
+              {isDiff && (
+                <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-red-500/20 text-red-300 border border-red-500/30">
+                  DIFF
+                </span>
+              )}
             </div>
           );
         })}
-        <div>{'}'}</div>
-      </div>
-    );
-  };
-
-  // UI IMPROVEMENT: Render display columns
-  const renderDisplayColumns = (displayData: Array<{key: string, value: any}>) => {
-    if (displayData.length === 0) return null;
-
-    return (
-      <div className="space-y-2 mb-4">
-        {displayData.map(({key, value}) => (
-          <div key={key} className="flex items-start">
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-purple-500" style={{fontSize: '0.75rem', marginTop: '2px'}}>
-              <path d="M1 12s4-8 11-8 11 8 11 8 11-8 11-8 11-8-4 4-4 4"/>
-              <path d="M2.5 7c0 0 2.5 2.5 2.5 2.5"/>
-              <path d="M2.5 17c0 0 2.5 2.5 2.5 2.5"/>
-            </svg>
-            <div>
-              <div style={{color: '#6b7280', fontSize: '0.8rem'}}>{key}:</div>
-              <div style={{color: '#111827', fontWeight: 600, fontSize: '0.8rem'}}>{formatValue(value)}</div>
-            </div>
-          </div>
-        ))}
+        <div className="text-theme-text-muted">{'}'}</div>
       </div>
     );
   };
 
   return (
-    // UI IMPROVEMENT: Container with new styling
-    <div style={{borderLeft: '3px solid #3b82f6', backgroundColor: '#f8faff', borderRadius: '0 12px 12px 0', padding: 0, margin: '4px 0 12px 0', overflow: 'hidden'}}>
-      {/* UI IMPROVEMENT: Two-column grid layout */}
-      <div className="grid grid-cols-2" style={{display: 'grid', gridTemplateColumns: '50% 50%', borderBottom: '1px solid #e5e7eb'}}>
-        {/* File A Panel */}
-        <div>
-          {/* UI IMPROVEMENT: File A header */}
-          <div style={{backgroundColor: '#eff6ff', padding: '10px 16px', borderBottom: '1px solid #dbeafe'}}>
-            <div className="flex items-center">
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{fontSize: '0.875rem', color: '#3b82f6'}}>
-                <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-              </svg>
-              <span style={{color: '#2563eb', fontSize: '0.8rem', fontWeight: 600}} title={fileAName}>
-                {fileAName.length > 30 ? fileAName.substring(0, 30) + '...' : fileAName}
-              </span>
+    <div className="rounded-xl border border-theme-border bg-theme-surface overflow-hidden my-2">
+      {/* Side by side comparison container */}
+      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-theme-border">
+        {/* File A Side */}
+        <div className="p-4 space-y-3 bg-theme-elevated/40">
+          <div className="flex items-center space-x-2 pb-2 border-b border-theme-border">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+            <span className="text-xs font-bold text-blue-400 font-mono truncate">{fileAName}</span>
+          </div>
+
+          {displayDataA.length > 0 && (
+            <div className="space-y-1 pb-2 border-b border-theme-border">
+              {displayDataA.map(({ key, value }) => (
+                <div key={key} className="text-xs flex justify-between">
+                  <span className="text-theme-text-secondary font-mono">{key}:</span>
+                  <span className="text-theme-text font-mono">{formatValue(value)}</span>
+                </div>
+              ))}
             </div>
-          </div>
-          {/* UI IMPROVEMENT: File A content */}
-          <div style={{padding: '16px'}}>
-            {renderDisplayColumns(displayDataA)}
-            {objectClassA && (
-              <div className="mb-4">
-                <div style={{color: '#6b7280', fontSize: '0.8rem'}}>ObjectClass:</div>
-                <div style={{color: '#111827', fontWeight: 600, fontSize: '0.8rem'}}>{objectClassA}</div>
-              </div>
-            )}
-            {renderProperties(propsA, diffKeys, true)}
-          </div>
+          )}
+
+          {renderProperties(propsA, diffKeys, true)}
         </div>
 
-        {/* File B Panel */}
-        <div style={{borderLeft: '1px solid #e5e7eb'}}>
-          {/* UI IMPROVEMENT: File B header */}
-          <div style={{backgroundColor: '#faf5ff', padding: '10px 16px', borderBottom: '1px solid #e9d5ff'}}>
-            <div className="flex items-center">
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{fontSize: '0.875rem', color: '#9333ea'}}>
-                <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-              </svg>
-              <span style={{color: '#7c3aed', fontSize: '0.8rem', fontWeight: 600}} title={fileBName}>
-                {fileBName.length > 30 ? fileBName.substring(0, 30) + '...' : fileBName}
-              </span>
+        {/* File B Side */}
+        <div className="p-4 space-y-3 bg-theme-elevated/40">
+          <div className="flex items-center space-x-2 pb-2 border-b border-theme-border">
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+            <span className="text-xs font-bold text-sky-400 font-mono truncate">{fileBName}</span>
+          </div>
+
+          {displayDataB.length > 0 && (
+            <div className="space-y-1 pb-2 border-b border-theme-border">
+              {displayDataB.map(({ key, value }) => (
+                <div key={key} className="text-xs flex justify-between">
+                  <span className="text-theme-text-secondary font-mono">{key}:</span>
+                  <span className="text-theme-text font-mono">{formatValue(value)}</span>
+                </div>
+              ))}
             </div>
-          </div>
-          {/* UI IMPROVEMENT: File B content */}
-          <div style={{padding: '16px'}}>
-            {renderDisplayColumns(displayDataB)}
-            {objectClassB && (
-              <div className="mb-4">
-                <div style={{color: '#6b7280', fontSize: '0.8rem'}}>ObjectClass:</div>
-                <div style={{color: '#111827', fontWeight: 600, fontSize: '0.8rem'}}>{objectClassB}</div>
-              </div>
-            )}
-            {renderProperties(propsB, diffKeys, false)}
-          </div>
+          )}
+
+          {renderProperties(propsB, diffKeys, false)}
         </div>
       </div>
 
-      {/* UI IMPROVEMENT: Panel footer */}
-      {result.status === 'match' && (!result.differences || result.differences.length === 0) ? (
-        <div style={{backgroundColor: '#f0fdf4', borderLeft: '3px solid #22c55e', padding: '10px 16px', display: 'flex', alignItems: 'center'}}>
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{fontSize: '0.875rem', color: '#16a34a'}}>
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
-          <span style={{color: '#16a34a', fontSize: '0.8rem', fontWeight: 500}}>
-            ✓ Values match (JSON key order ignored, strict comparison)
+      {/* Footer info bar */}
+      <div className="px-4 py-2 bg-theme-elevated border-t border-theme-border flex items-center justify-between text-xs">
+        {result.status === 'match' ? (
+          <span className="text-emerald-400 font-semibold flex items-center space-x-1">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Identical attributes detected across evaluated schema</span>
           </span>
-        </div>
-      ) : (
-        <div style={{backgroundColor: '#fef2f2', borderLeft: '3px solid #ef4444', padding: '10px 16px', display: 'flex', alignItems: 'center'}}>
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{fontSize: '0.875rem', color: '#dc2626'}}>
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="15" y1="9" x2="9" y2="15"/>
-            <line x1="9" y1="9" x2="15" y2="15"/>
-          </svg>
-          <span style={{color: '#dc2626', fontSize: '0.8rem', fontWeight: 500}}>
-            ✗ Values differ — {diffKeys.length} field(s) changed
+        ) : (
+          <span className="text-amber-400 font-semibold flex items-center space-x-1">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{diffKeys.length} attribute mismatch(es) detected in row</span>
           </span>
-        </div>
-      )}
+        )}
+        <span className="text-[10px] text-theme-text-muted font-mono">Row Key: {result.row_key}</span>
+      </div>
     </div>
   );
 };

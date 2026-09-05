@@ -13,7 +13,16 @@ from models import (
 from file_handler import file_handler
 from comparison import comparison_engine
 
-app = FastAPI(title="Parquet Comparison API")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Clean up expired files on startup."""
+    file_handler.cleanup_expired_files()
+    yield
+
+
+app = FastAPI(title="Parquet Comparison API", lifespan=lifespan)
 
 # Configure CORS
 # DOCKER: Allow all origins for Docker deployment (Nginx serves frontend and proxies API)
@@ -24,12 +33,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Clean up expired files on startup."""
-    file_handler.cleanup_expired_files()
 
 
 @app.post("/upload", response_model=FileUploadResponse)
@@ -88,7 +91,7 @@ async def compare_files(request: CompareRequest, background_tasks: BackgroundTas
     
     # Determine if we need async processing (large files)
     total_rows = max(len(df_a), len(df_b))
-    use_async = total_rows > 100000
+    use_async = total_rows > 5000
     
     if use_async:
         # Create job and process in background
@@ -302,7 +305,7 @@ async def get_distinct_values(file_id: str, column: str, limit: int = 100, sampl
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     try:
-        df = pd.read_parquet(file_path)
+        df = pd.read_parquet(file_path, columns=[column])
         
         if column not in df.columns:
             raise HTTPException(status_code=400, detail=f"Column '{column}' not found in file")

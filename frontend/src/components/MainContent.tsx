@@ -6,8 +6,8 @@ interface MainContentProps {
 
 const MainContent: React.FC<MainContentProps> = ({ children }) => {
   return (
-    <main className="flex-1 min-w-0 bg-gray-50 dark:bg-[#0F1117] overflow-y-auto overflow-x-hidden">
-      <div className="p-8 max-w-full">
+    <main className="flex-1 min-w-0 bg-theme-base overflow-y-auto overflow-x-hidden transition-colors duration-200">
+      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 animate-fade-in">
         {children}
       </div>
     </main>

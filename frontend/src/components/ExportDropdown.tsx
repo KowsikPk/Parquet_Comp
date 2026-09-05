@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { CompareResponse } from '../types';
 
 interface ExportDropdownProps {
@@ -8,13 +8,28 @@ interface ExportDropdownProps {
   fileBName?: string;
 }
 
-const ExportDropdown: React.FC<ExportDropdownProps> = ({ comparisonResult, onDownloadReport, fileAName = 'File A', fileBName = 'File B' }) => {
+const ExportDropdown: React.FC<ExportDropdownProps> = ({
+  comparisonResult,
+  onDownloadReport,
+  fileAName = 'File A',
+  fileBName = 'File B'
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleCopySummary = () => {
     if (!comparisonResult?.summary) return;
-    
+
     const summary = {
       [`${fileAName}_rows`]: comparisonResult.summary.total_a,
       [`${fileBName}_rows`]: comparisonResult.summary.total_b,
@@ -24,14 +39,14 @@ const ExportDropdown: React.FC<ExportDropdownProps> = ({ comparisonResult, onDow
       [`only_in_${fileBName}`]: comparisonResult.summary.only_in_b,
       columns_compared: comparisonResult.columns_compared
     };
-    
+
     navigator.clipboard.writeText(JSON.stringify(summary, null, 2));
     setIsOpen(false);
   };
 
   const handleExportJSON = () => {
     if (!comparisonResult) return;
-    
+
     const data = JSON.stringify(comparisonResult, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = window.URL.createObjectURL(blob);
@@ -52,79 +67,65 @@ const ExportDropdown: React.FC<ExportDropdownProps> = ({ comparisonResult, onDow
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* UI IMPROVEMENT #20: Export button with DOWNLOAD icon */}
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-500 flex items-center space-x-2"
-        style={{minWidth: '80px', fontSize: '0.875rem'}}
+        className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center space-x-2 transition-all"
       >
-        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1rem'}}>
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        <span>Export</span>
-        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} style={{fontSize: '1rem'}}>
-          <polyline points="6 9 12 15 18 9"/>
+        <span>Export Results</span>
+        <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#1A1D27] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
-          <div className="py-1">
-            {/* UI IMPROVEMENT #20: CSV Report with FILE icon */}
-            <button
-              onClick={onDownloadReport}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1E2130] flex items-center space-x-2"
-              style={{fontSize: '0.875rem'}}
-            >
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1rem'}}>
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
-              <span>CSV Report</span>
-            </button>
-            
-            {/* UI IMPROVEMENT #20: Copy Summary with CLIPBOARD icon */}
-            <button
-              onClick={handleCopySummary}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1E2130] flex items-center space-x-2"
-              style={{fontSize: '0.875rem'}}
-            >
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1rem'}}>
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-              <span>Copy Summary to Clipboard</span>
-            </button>
-            
-            {/* UI IMPROVEMENT #20: JSON Export with CODE icon */}
-            <button
-              onClick={handleExportJSON}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1E2130] flex items-center space-x-2"
-              style={{fontSize: '0.875rem'}}
-            >
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1rem'}}>
-                <polyline points="16 18 22 12 16 6"/>
-                <polyline points="8 6 2 12 8 18"/>
-              </svg>
-              <span>JSON Export</span>
-            </button>
-            
-            {/* UI IMPROVEMENT #20: Print View with PRINTER icon */}
-            <button
-              onClick={handlePrintView}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#1E2130] flex items-center space-x-2"
-              style={{fontSize: '0.875rem'}}
-            >
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1rem'}}>
-                <polyline points="6 9 6 2 18 2 18 9"/>
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                <rect x="6" y="14" width="12" height="8"/>
-              </svg>
-              <span>Print View</span>
-            </button>
-          </div>
+        <div className="absolute right-0 top-full mt-2 w-56 bg-theme-elevated border border-theme-border rounded-xl shadow-2xl p-1.5 z-50 animate-slide-up">
+          <button
+            type="button"
+            onClick={onDownloadReport}
+            className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-theme-text hover:bg-blue-600/20 hover:text-blue-300 flex items-center space-x-2 transition-colors"
+          >
+            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Download CSV Report</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopySummary}
+            className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-theme-text hover:bg-blue-600/20 hover:text-blue-300 flex items-center space-x-2 transition-colors"
+          >
+            <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Copy JSON Summary</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportJSON}
+            className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-theme-text hover:bg-blue-600/20 hover:text-blue-300 flex items-center space-x-2 transition-colors"
+          >
+            <svg className="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+            <span>Export Full JSON Dump</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintView}
+            className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-theme-text hover:bg-blue-600/20 hover:text-blue-300 flex items-center space-x-2 transition-colors"
+          >
+            <svg className="w-4 h-4 text-theme-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            <span>Print View</span>
+          </button>
         </div>
       )}
     </div>

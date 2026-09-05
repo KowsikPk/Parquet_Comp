@@ -7,25 +7,34 @@ interface TopNavProps {
 
 const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDarkMode }) => {
   return (
-    <nav className="h-16 bg-white dark:bg-[#0F1117] border-b border-gray-200 dark:border-[#2D3148] flex items-center justify-between px-6 sticky top-0 z-50">
-      {/* UI IMPROVEMENT #25: Logo with DATABASE icon */}
+    <nav className="h-16 bg-theme-surface/80 backdrop-blur-md border-b border-theme-border flex items-center justify-between px-6 sticky top-0 z-50">
+      {/* Brand & Logo */}
       <div className="flex items-center space-x-3">
-        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white" style={{fontSize: '1.25rem'}}>
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1D4ED8] to-[#38BDF8] flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
             <ellipse cx="12" cy="5" rx="9" ry="3"/>
             <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
           </svg>
         </div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-[#F1F5F9]" style={{fontSize: '1.25rem'}}>Parquet Compare</h1>
+        <div>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-lg font-bold tracking-tight text-theme-text">Parquet Compare</h1>
+            <span className="px-2 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full">v2.0</span>
+          </div>
+          <p className="text-[11px] text-theme-text-secondary font-medium">Deep Column & Row Diff Engine</p>
+        </div>
       </div>
 
-      {/* Right side actions */}
-      <div className="flex items-center space-x-4">
-        {/* UI IMPROVEMENT #28: Keyboard shortcuts tooltip with KEYBOARD icon */}
+      {/* Right Side Controls */}
+      <div className="flex items-center space-x-3">
+        {/* Keyboard Shortcuts Tooltip Button */}
         <div className="relative group">
-          <button className="p-2 text-gray-500 dark:text-[#94A3B8] hover:text-gray-700 dark:hover:text-[#F1F5F9] transition-colors">
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1.25rem'}}>
+          <button 
+            className="p-2.5 rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-elevated border border-transparent hover:border-theme-border transition-all"
+            title="Keyboard shortcuts"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="4" width="20" height="16" rx="2"/>
               <path d="M6 8h.01"/>
               <path d="M10 8h.01"/>
@@ -38,28 +47,28 @@ const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDarkMode }) => {
               <path d="M7 16h10"/>
             </svg>
           </button>
-          {/* Tooltip */}
-          <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-[#1A1D27] border border-gray-200 dark:border-[#2D3148] rounded-lg shadow-lg p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-            <h3 className="font-semibold text-gray-900 dark:text-[#F1F5F9] mb-2" style={{fontSize: '0.875rem'}}>Keyboard Shortcuts</h3>
-            <div className="space-y-1 text-sm text-gray-600 dark:text-[#94A3B8]" style={{fontSize: '0.875rem'}}>
-              <div className="flex justify-between"><span>Ctrl+1</span><span>Upload</span></div>
-              <div className="flex justify-between"><span>Ctrl+2</span><span>Configure</span></div>
-              <div className="flex justify-between"><span>Ctrl+3</span><span>Results</span></div>
-              <div className="flex justify-between"><span>Ctrl+F</span><span>Search</span></div>
-              <div className="flex justify-between"><span>↑/↓</span><span>Navigate</span></div>
-              <div className="flex justify-between"><span>Space</span><span>Expand row</span></div>
+          
+          {/* Shortcuts Dropdown */}
+          <div className="absolute right-0 top-full mt-2 w-72 bg-theme-elevated/95 backdrop-blur-md border border-theme-border rounded-xl shadow-2xl p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 transform group-hover:translate-y-0 translate-y-1">
+            <h3 className="text-xs font-semibold text-theme-text-secondary uppercase tracking-wider mb-3">Keyboard Shortcuts</h3>
+            <div className="space-y-2 text-xs text-theme-text-secondary">
+              <div className="flex justify-between items-center"><span className="font-mono bg-theme-muted px-2 py-0.5 rounded text-theme-text-secondary">Ctrl + 1</span><span>Step 1: Upload</span></div>
+              <div className="flex justify-between items-center"><span className="font-mono bg-theme-muted px-2 py-0.5 rounded text-theme-text-secondary">Ctrl + 2</span><span>Step 2: Configure</span></div>
+              <div className="flex justify-between items-center"><span className="font-mono bg-theme-muted px-2 py-0.5 rounded text-theme-text-secondary">Ctrl + 3</span><span>Step 3: Results</span></div>
+              <div className="flex justify-between items-center"><span className="font-mono bg-theme-muted px-2 py-0.5 rounded text-theme-text-secondary">Ctrl + F</span><span>Search Results</span></div>
             </div>
           </div>
         </div>
 
-        {/* UI IMPROVEMENT #28: Dark mode toggle with SUN/MOON icons */}
+        {/* Theme Switcher Button */}
         <button
           onClick={onThemeToggle}
-          className="p-2 text-gray-500 dark:text-[#94A3B8] hover:text-gray-700 dark:hover:text-[#F1F5F9] transition-colors"
-          aria-label="Toggle dark mode"
+          className="p-2.5 rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-elevated border border-transparent hover:border-theme-border transition-all"
+          aria-label="Toggle theme"
+          title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {isDarkMode ? (
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1.25rem'}}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400">
               <circle cx="12" cy="12" r="5"/>
               <line x1="12" y1="1" x2="12" y2="3"/>
               <line x1="12" y1="21" x2="12" y2="23"/>
@@ -71,7 +80,7 @@ const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDarkMode }) => {
               <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
             </svg>
           ) : (
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{fontSize: '1.25rem'}}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
             </svg>
           )}

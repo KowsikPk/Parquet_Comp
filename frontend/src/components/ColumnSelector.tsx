@@ -10,8 +10,8 @@ interface ColumnSelectorProps {
   onClearAll: () => void;
   compareAll: boolean;
   onCompareAllChange: (compareAll: boolean) => void;
-  displayColumns: string[];  // UI IMPROVEMENT: Display-only columns
-  onDisplayColumnChange: (columns: string[]) => void;  // UI IMPROVEMENT: Display column change handler
+  displayColumns: string[];
+  onDisplayColumnChange: (columns: string[]) => void;
   fileAName?: string;
   fileBName?: string;
 }
@@ -37,31 +37,23 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({
     onlyInA: true,
     onlyInB: true
   });
-  const [showDisplayOnly, setShowDisplayOnly] = useState(false);  // UI IMPROVEMENT: Toggle for display-only section
+  const [showDisplayOnly, setShowDisplayOnly] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const truncateFilename = (name: string, maxLength: number = 20) => {
+  const truncateFilename = (name: string, maxLength: number = 14) => {
     if (name.length <= maxLength) return name;
-    const ext = name.includes('.') ? '.' + name.split('.').pop() : '';
-    const baseName = name.replace(ext, '');
-    return baseName.substring(0, maxLength - ext.length - 3) + '...' + ext;
+    return name.substring(0, maxLength - 3) + '...';
   };
 
-  // Group columns
   const columnGroups = useMemo(() => {
     const allColumns = Array.from(new Set([...columnsA, ...columnsB])).sort();
     const commonColumns = allColumns.filter(col => columnsA.includes(col) && columnsB.includes(col));
     const onlyInA = allColumns.filter(col => columnsA.includes(col) && !columnsB.includes(col));
     const onlyInB = allColumns.filter(col => columnsB.includes(col) && !columnsA.includes(col));
 
-    return {
-      common: commonColumns,
-      onlyInA,
-      onlyInB
-    };
+    return { common: commonColumns, onlyInA, onlyInB };
   }, [columnsA, columnsB]);
 
-  // Filter columns based on search
   const filteredGroups = useMemo(() => {
     const query = searchQuery.toLowerCase();
     if (!query) return columnGroups;
@@ -98,75 +90,48 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({
 
   const renderColumnItem = (column: string, type: 'common' | 'onlyInA' | 'onlyInB') => {
     const isSelected = selectedColumns.includes(column);
-    const badgeColor = type === 'common' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
-                      type === 'onlyInA' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' :
-                      'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300';
+    const badgeColor = type === 'common' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                      type === 'onlyInA' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                      'bg-sky-500/10 text-sky-400 border border-sky-500/20';
     const badgeText = type === 'common' ? 'Common' :
-                      type === 'onlyInA' ? `Only in ${truncateFilename(fileAName, 10)}` :
-                      `Only in ${truncateFilename(fileBName, 10)}`;
+                      type === 'onlyInA' ? `In ${truncateFilename(fileAName)}` :
+                      `In ${truncateFilename(fileBName)}`;
 
-    // UI IMPROVEMENT #5: Highlight matching text
     const highlightMatch = (text: string, query: string) => {
       if (!query) return text;
       const parts = text.split(new RegExp(`(${query})`, 'gi'));
       return parts.map((part, i) => 
         part.toLowerCase() === query.toLowerCase() 
-          ? <mark key={i} className="bg-yellow-200 dark:bg-yellow-700">{part}</mark>
+          ? <mark key={i} className="bg-blue-500/30 text-white rounded px-0.5">{part}</mark>
           : part
       );
     };
 
-    // UI IMPROVEMENT #5: Fade non-matching columns
     const isMatch = !searchQuery || column.toLowerCase().includes(searchQuery.toLowerCase());
     const opacity = isMatch ? 1 : 0.4;
-
-    // UI IMPROVEMENT #4: Icon for column type
-    const ColumnIcon = () => {
-      if (type === 'common') {
-        return (
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 mr-2">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="12 5 19 12 12 19"/>
-          </svg>
-        );
-      } else if (type === 'onlyInA') {
-        return (
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600 dark:text-blue-400 mr-2">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="12 5 19 12 12 19"/>
-          </svg>
-        );
-      } else {
-        return (
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-600 dark:text-purple-400 mr-2" style={{transform: 'scaleX(-1)'}}>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="12 5 19 12 12 19"/>
-          </svg>
-        );
-      }
-    };
 
     return (
       <label
         key={column}
-        className={`flex items-center p-3 rounded-lg border transition-all cursor-pointer hover:scale-[1.02] ${
+        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
           isSelected
-            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 shadow-sm'
-            : 'bg-white dark:bg-[#0F1117] border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+            ? 'bg-blue-600/15 border-blue-500/50 text-theme-text shadow-sm'
+            : 'bg-theme-elevated border-theme-border hover:border-slate-700 text-theme-text-secondary'
         }`}
-        style={{ opacity, borderLeftWidth: '3px', borderLeftColor: type === 'common' ? '#22c55e' : type === 'onlyInA' ? '#3b82f6' : '#a855f7' }}
+        style={{ opacity }}
       >
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onColumnToggle(column)}
-          className="form-checkbox h-4 w-4 text-blue-600 mr-3 flex-shrink-0"
-        />
-        <ColumnIcon />
-        <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-300 truncate" style={{fontSize: '0.875rem'}}>
-          {highlightMatch(column, searchQuery)}
-        </span>
-        <span className={`text-xs px-2 py-1 rounded flex-shrink-0 ${badgeColor}`} style={{fontSize: '0.75rem'}}>
+        <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onColumnToggle(column)}
+            className="w-4 h-4 rounded border-theme-border bg-theme-base text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+          />
+          <span className="text-xs font-mono font-medium truncate">
+            {highlightMatch(column, searchQuery)}
+          </span>
+        </div>
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${badgeColor}`}>
           {badgeText}
         </span>
       </label>
@@ -174,299 +139,165 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-[#1A1D27] rounded-lg shadow border-l-4 border-blue-500 p-6">
-      {/* UI IMPROVEMENT #4: Section header with COLUMNS icon */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{fontSize: '1.25rem'}}>
-            <rect x="3" y="3" width="8" height="18"/>
-            <rect x="13" y="3" width="8" height="18"/>
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#F1F5F9]" style={{fontSize: '1.125rem'}}>Column Selection</h3>
+    <div className="bg-theme-surface border border-theme-border rounded-2xl p-5 shadow-lg space-y-4">
+      {/* Top Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-theme-text">Column Selection</h3>
+            <p className="text-[11px] text-theme-text-secondary">Choose schema columns to evaluate during comparison</p>
+          </div>
         </div>
         <button
+          type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          className="p-1.5 rounded-lg text-theme-text-secondary hover:text-theme-text hover:bg-theme-elevated transition-all"
         >
-          <svg
-            className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <svg className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
       </div>
-      
-      <div className={`overflow-hidden transition-all duration-250 ${isExpanded ? 'max-h-[800px]' : 'max-h-0'}`}>
-        <div className="mb-4">
+
+      {isExpanded && (
+        <div className="space-y-4">
           <ToggleSwitch
-            leftLabel="Select Specific"
-            rightLabel="Compare All"
+            leftLabel="Select Specific Columns"
+            rightLabel="Compare All Columns"
             isRight={compareAll}
             onToggle={(isRight) => onCompareAllChange(isRight)}
           />
-        </div>
 
-        {!compareAll && (
-          <div className="space-y-4">
-            {/* UI IMPROVEMENT #5: Search Input with SEARCH icon */}
-            <div className="relative">
-              <svg 
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-                width="1em"
-                height="1em"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{fontSize: '1rem'}}
-              >
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search columns..."
-                className="w-full pl-10 pr-16 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-[#1A1D27] text-gray-900 dark:text-[#F1F5F9] text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{fontSize: '0.875rem', minWidth: '120px'}}
-              />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" style={{fontSize: '0.875rem'}}>
-                {filteredCount} found
-              </span>
-            </div>
-
-            {/* UI IMPROVEMENT #7: Keyboard hint (hidden on touch devices) */}
-            <div className="text-gray-400 text-xs" style={{fontSize: '0.7rem', display: window.matchMedia('(pointer: coarse)').matches ? 'none' : 'block'}}>
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-1">
-                <rect x="2" y="4" width="20" height="16" rx="2"/>
-                <path d="M6 8h.01"/>
-                <path d="M10 8h.01"/>
-                <path d="M14 8h.01"/>
-                <path d="M18 8h.01"/>
-                <path d="M6 12h.01"/>
-                <path d="M10 12h.01"/>
-                <path d="M14 12h.01"/>
-                <path d="M18 12h.01"/>
-                <path d="M7 16h10"/>
-              </svg>
-              ↑↓ navigate · Space select · Ctrl+A all · Esc clear
-            </div>
-
-            {/* Column Sections Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Common Columns Section */}
-              {filteredGroups.common.length > 0 && (
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col">
-                  <button
-                    onClick={() => toggleSection('common')}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F1117] flex items-center justify-between hover:bg-gray-100 dark:hover:bg-[#1E2130] transition-colors flex-shrink-0"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <svg
-                        className={`w-4 h-4 transition-transform duration-200 ${expandedSections.common ? 'rotate-90' : ''}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Common ({columnGroups.common.length})
-                      </span>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          selectSection(filteredGroups.common);
-                        }}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
-                      >
-                        Select
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearSection(filteredGroups.common);
-                        }}
-                        className="text-xs text-red-600 dark:text-red-400 hover:underline whitespace-nowrap"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </button>
-                  {expandedSections.common && (
-                    <div className="p-3 space-y-2 max-h-64 overflow-y-auto flex-1">
-                      {filteredGroups.common.map((col) => renderColumnItem(col, 'common'))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Only in File A Section */}
-              {filteredGroups.onlyInA.length > 0 && (
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col">
-                  <button
-                    onClick={() => toggleSection('onlyInA')}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F1117] flex items-center justify-between hover:bg-gray-100 dark:hover:bg-[#1E2130] transition-colors flex-shrink-0"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <svg
-                        className={`w-4 h-4 transition-transform duration-200 ${expandedSections.onlyInA ? 'rotate-90' : ''}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Only in A ({columnGroups.onlyInA.length})
-                      </span>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          selectSection(filteredGroups.onlyInA);
-                        }}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
-                      >
-                        Select
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearSection(filteredGroups.onlyInA);
-                        }}
-                        className="text-xs text-red-600 dark:text-red-400 hover:underline whitespace-nowrap"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </button>
-                  {expandedSections.onlyInA && (
-                    <div className="p-3 space-y-2 max-h-64 overflow-y-auto flex-1">
-                      {filteredGroups.onlyInA.map((col) => renderColumnItem(col, 'onlyInA'))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Only in File B Section */}
-              {filteredGroups.onlyInB.length > 0 && (
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col">
-                  <button
-                    onClick={() => toggleSection('onlyInB')}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0F1117] flex items-center justify-between hover:bg-gray-100 dark:hover:bg-[#1E2130] transition-colors flex-shrink-0"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <svg
-                        className={`w-4 h-4 transition-transform duration-200 ${expandedSections.onlyInB ? 'rotate-90' : ''}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Only in B ({columnGroups.onlyInB.length})
-                      </span>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          selectSection(filteredGroups.onlyInB);
-                        }}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
-                      >
-                        Select
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearSection(filteredGroups.onlyInB);
-                        }}
-                        className="text-xs text-red-600 dark:text-red-400 hover:underline whitespace-nowrap"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </button>
-                  {expandedSections.onlyInB && (
-                    <div className="p-3 space-y-2 max-h-64 overflow-y-auto flex-1">
-                      {filteredGroups.onlyInB.map((col) => renderColumnItem(col, 'onlyInB'))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* UI IMPROVEMENT: Display-Only Column Selection */}
-            <div className="mt-6 bg-gray-50 dark:bg-[#0F1117] rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center">
-                  <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-purple-500" style={{fontSize: '1rem'}}>
-                    <path d="M1 12s4-8 11-8 11 8 11 8 11-8 11-8 11-8-4 4-4 4"/>
-                    <path d="M2.5 7c0 0 2.5 2.5 2.5 2.5"/>
-                    <path d="M2.5 17c0 0 2.5 2.5 2.5 2.5"/>
+          {!compareAll && (
+            <div className="space-y-4">
+              {/* Search & Actions Bar */}
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                <div className="relative flex-1">
+                  <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-[#F1F5F9]" style={{fontSize: '0.875rem'}}>
-                    Display-Only Columns
-                  </h4>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 dark:text-gray-400" style={{fontSize: '0.75rem'}}>
-                    (shown in view details, not used for comparison)
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search columns..."
+                    className="w-full pl-9 pr-20 py-2 bg-theme-elevated border border-theme-border rounded-xl text-xs text-theme-text placeholder-theme-text-muted focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-theme-text-secondary">
+                    {filteredCount} found
                   </span>
+                </div>
+
+                <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => setShowDisplayOnly(!showDisplayOnly)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
-                      showDisplayOnly ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
+                    type="button"
+                    onClick={onSelectAll}
+                    className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-semibold transition-all"
                   >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                        showDisplayOnly ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClearAll}
+                    className="px-3 py-1.5 bg-theme-elevated hover:bg-theme-muted text-theme-text-secondary hover:text-theme-text border border-theme-border rounded-xl text-xs font-semibold transition-all"
+                  >
+                    Clear
                   </button>
                 </div>
               </div>
 
-              {showDisplayOnly && (
-                <div className="mt-3">
-                  <div className="flex items-center mb-2">
-                    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 text-gray-400" style={{fontSize: '0.75rem'}}>
-                      <circle cx="11" cy="11" r="8"/>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                    <input
-                      type="text"
-                      placeholder="Search columns..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-[#0F1117] text-gray-900 dark:text-[#F1F5F9] placeholder-gray-500 dark:placeholder-gray-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{fontSize: '0.875rem'}}
-                    />
+              {/* Column Groups */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Common Columns */}
+                {filteredGroups.common.length > 0 && (
+                  <div className="bg-theme-elevated/50 border border-theme-border rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between pb-2 border-b border-theme-border">
+                      <button type="button" onClick={() => toggleSection('common')} className="text-xs font-bold text-emerald-400 flex items-center space-x-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span>Common ({columnGroups.common.length})</span>
+                      </button>
+                      <div className="flex space-x-2">
+                        <button type="button" onClick={() => selectSection(filteredGroups.common)} className="px-2.5 py-1 text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg transition-all">All</button>
+                        <button type="button" onClick={() => clearSection(filteredGroups.common)} className="px-2.5 py-1 text-xs font-semibold bg-theme-elevated hover:bg-theme-muted text-theme-text-secondary border border-theme-border rounded-lg transition-all">None</button>
+                      </div>
+                    </div>
+                    {expandedSections.common && (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {filteredGroups.common.map((col) => renderColumnItem(col, 'common'))}
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                )}
+
+                {/* Only in A */}
+                {filteredGroups.onlyInA.length > 0 && (
+                  <div className="bg-theme-elevated/50 border border-theme-border rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between pb-2 border-b border-theme-border">
+                      <button type="button" onClick={() => toggleSection('onlyInA')} className="text-xs font-bold text-blue-400 flex items-center space-x-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span>Only in A ({columnGroups.onlyInA.length})</span>
+                      </button>
+                      <div className="flex space-x-2">
+                        <button type="button" onClick={() => selectSection(filteredGroups.onlyInA)} className="px-2.5 py-1 text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg transition-all">All</button>
+                        <button type="button" onClick={() => clearSection(filteredGroups.onlyInA)} className="px-2.5 py-1 text-xs font-semibold bg-theme-elevated hover:bg-theme-muted text-theme-text-secondary border border-theme-border rounded-lg transition-all">None</button>
+                      </div>
+                    </div>
+                    {expandedSections.onlyInA && (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {filteredGroups.onlyInA.map((col) => renderColumnItem(col, 'onlyInA'))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Only in B */}
+                {filteredGroups.onlyInB.length > 0 && (
+                  <div className="bg-theme-elevated/50 border border-theme-border rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between pb-2 border-b border-theme-border">
+                      <button type="button" onClick={() => toggleSection('onlyInB')} className="text-xs font-bold text-sky-400 flex items-center space-x-1.5">
+                        <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                        <span>Only in B ({columnGroups.onlyInB.length})</span>
+                      </button>
+                      <div className="flex space-x-2">
+                        <button type="button" onClick={() => selectSection(filteredGroups.onlyInB)} className="px-2.5 py-1 text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg transition-all">All</button>
+                        <button type="button" onClick={() => clearSection(filteredGroups.onlyInB)} className="px-2.5 py-1 text-xs font-semibold bg-theme-elevated hover:bg-theme-muted text-theme-text-secondary border border-theme-border rounded-lg transition-all">None</button>
+                      </div>
+                    </div>
+                    {expandedSections.onlyInB && (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {filteredGroups.onlyInB.map((col) => renderColumnItem(col, 'onlyInB'))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Display-Only Columns Section Toggle */}
+              <div className="bg-theme-elevated border border-theme-border rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-theme-text">Display-Only Metadata Columns</span>
+                    <span className="text-[10px] text-theme-text-secondary">(shown in row details, excluded from diff computation)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDisplayOnly(!showDisplayOnly)}
+                    className="px-2.5 py-1 bg-theme-base border border-theme-border text-blue-400 hover:text-blue-300 text-xs rounded-lg font-medium"
+                  >
+                    {showDisplayOnly ? 'Hide' : `Configure (${displayColumns.length})`}
+                  </button>
+                </div>
+
+                {showDisplayOnly && (
+                  <div className="pt-2 border-t border-theme-border space-y-1.5 max-h-40 overflow-y-auto pr-1">
                     {columnGroups.common.map((col) => (
-                      <label
-                        key={col}
-                        className={`flex items-center p-2 rounded border transition-all cursor-pointer ${
-                          displayColumns.includes(col)
-                            ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-500'
-                            : 'bg-white dark:bg-[#1A1D27] border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
-                      >
+                      <label key={col} className="flex items-center space-x-2 text-xs font-mono text-theme-text-secondary cursor-pointer p-1 rounded hover:bg-theme-base">
                         <input
                           type="checkbox"
                           checked={displayColumns.includes(col)}
@@ -477,95 +308,31 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({
                               onDisplayColumnChange([...displayColumns, col]);
                             }
                           }}
-                          className="form-checkbox h-4 w-4 text-purple-600 mr-3 flex-shrink-0"
+                          className="w-3.5 h-3.5 rounded border-theme-border bg-theme-base text-sky-600 focus:ring-sky-500"
                         />
-                        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-purple-500" style={{fontSize: '0.75rem'}}>
-                          <path d="M1 12s4-8 11-8 11 8 11 8 11-8 11-8 11-8-4 4-4 4"/>
-                          <path d="M2.5 7c0 0 2.5 2.5 2.5 2.5"/>
-                          <path d="M2.5 17c0 0 2.5 2.5 2.5 2.5"/>
-                        </svg>
-                        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1" style={{fontSize: '0.875rem'}}>
-                          {col}
-                        </span>
+                        <span>{col}</span>
                       </label>
                     ))}
                   </div>
-                  {displayColumns.length > 0 && (
-                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400" style={{fontSize: '0.75rem'}}>
-                      {displayColumns.length} display-only column(s) selected
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* UI IMPROVEMENT #6: Progress Bar and Quick Actions with icons */}
-            <div className="bg-gray-50 dark:bg-[#0F1117] rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-3">
-                {/* UI IMPROVEMENT #6: Selection counter badge with COLUMNS icon */}
-                <div className="flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 rounded-full" style={{fontSize: '0.875rem'}}>
-                  <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1" style={{fontSize: '0.75rem'}}>
-                    <rect x="3" y="3" width="8" height="18"/>
-                    <rect x="13" y="3" width="8" height="18"/>
-                  </svg>
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                    {selectedColumns.length} / {totalColumns} columns
-                  </span>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  {/* UI IMPROVEMENT #4: Action buttons with icons */}
-                  <button
-                    onClick={onSelectAll}
-                    className="px-3 py-1 text-xs bg-blue-500 dark:bg-blue-600 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-500 transition-colors whitespace-nowrap flex items-center"
-                    style={{minWidth: '80px', fontSize: '0.75rem'}}
-                  >
-                    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                      <polyline points="22 4 12 14.01 9 11.01"/>
-                    </svg>
-                    Select All
-                  </button>
-                  <button
-                    onClick={onClearAll}
-                    className="px-3 py-1 text-xs bg-gray-500 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-500 transition-colors whitespace-nowrap flex items-center"
-                    style={{minWidth: '80px', fontSize: '0.75rem'}}
-                  >
-                    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                      <line x1="18" y1="6" x2="6" y2="18"/>
-                      <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                    Clear All
-                  </button>
-                  <button
-                    onClick={() => selectSection(columnGroups.common)}
-                    className="px-3 py-1 text-xs bg-green-500 dark:bg-green-600 text-white rounded hover:bg-green-600 dark:hover:bg-green-500 transition-colors whitespace-nowrap flex items-center"
-                    style={{minWidth: '80px', fontSize: '0.75rem'}}
-                  >
-                    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                      <rect x="3" y="3" width="8" height="18"/>
-                      <rect x="13" y="3" width="8" height="18"/>
-                    </svg>
-                    Select Common
-                  </button>
-                </div>
+                )}
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div
-                  className="bg-blue-500 dark:bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(selectedColumns.length / totalColumns) * 100}%` }}
-                />
+
+              {/* Progress Footer Bar */}
+              <div className="bg-theme-elevated p-3 rounded-xl border border-theme-border flex items-center justify-between">
+                <span className="text-xs font-medium text-theme-text-secondary">
+                  <span className="font-bold text-blue-400">{selectedColumns.length}</span> of {totalColumns} columns selected for diffing
+                </span>
+                <div className="w-36 bg-theme-base h-2 rounded-full overflow-hidden border border-theme-border">
+                  <div
+                    className="bg-gradient-to-r from-blue-500 to-sky-500 h-full transition-all duration-300"
+                    style={{ width: `${totalColumns ? (selectedColumns.length / totalColumns) * 100 : 0}%` }}
+                  />
+                </div>
               </div>
             </div>
-
-            {/* Empty State */}
-            {selectedColumns.length === 0 && (
-              <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
-                No columns selected. Select columns above to compare specific fields.
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

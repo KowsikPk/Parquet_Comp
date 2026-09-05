@@ -28,14 +28,13 @@ class FileHandler:
         
         # Read metadata
         try:
-            table = pq.read_table(file_path)
-            df = table.to_pandas()
+            parquet_file = pq.ParquetFile(file_path)
             
             self.file_metadata[file_id] = {
                 "file_path": str(file_path),
                 "original_filename": filename,
-                "row_count": len(df),
-                "columns": list(df.columns),
+                "row_count": parquet_file.metadata.num_rows,
+                "columns": parquet_file.schema_arrow.names,
                 "file_size": len(file_content),
                 "uploaded_at": datetime.now(),
                 "expires_at": datetime.now() + timedelta(hours=1)

@@ -25,6 +25,7 @@ COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
+RUN sed -i 's/\r$//' /etc/nginx/nginx.conf
 
 # Create directories for file uploads
 RUN mkdir -p /app/uploads && chown -R nobody:nobody /app/uploads
@@ -33,4 +34,4 @@ RUN mkdir -p /app/uploads && chown -R nobody:nobody /app/uploads
 EXPOSE 80
 
 # Start both services
-CMD sh -c "python backend/main.py & nginx -g 'daemon off;'"
+CMD ["sh", "-c", "python backend/main.py & nginx -g 'daemon off;'"]
