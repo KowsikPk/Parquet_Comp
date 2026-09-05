@@ -1,0 +1,99 @@
+---
+# Persistent Volume Claim for Uploads
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: parquet-comp-uploads-pvc
+  labels:
+    app: parquet-comp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parquet-comp-deployment
+  labels:
+    app: parquet-comp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parquet-comp
+  template:
+    metadata:
+      labels:
+        app: parquet-comp
+    spec:
+      containers:
+        - name: parquet-comp
+          # Update this image name to your actual container registry if using one
+          # Example: myregistry.com/parquet-comp:latest
+          image: parquet_comp-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: uploads-volume
+              mountPath: /app/uploads
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+      volumes:
+        - name: uploads-volume
+          persistentVolumeClaim:
+            claimName: parquet-comp-uploads-pvc
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: parquet-comp-service
+  labels:
+    app: parquet-comp
+spec:
+  selector:
+    app: parquet-comp
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP
+
+---
+# Ingress (for Hostname Access)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: parquet-comp-ingress
+  annotations:
+    # If using Nginx Ingress Controller, uncomment the line below:
+    # kubernetes.io/ingress.class: "nginx"
+    
+    # Allows larger file uploads through the ingress controller
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+spec:
+  rules:
+    # This is the specific hostname you requested. 
+    # You will need to map this in your DNS or local hosts file (C:\Windows\System32\drivers\etc\hosts)
+    - host: parquet-compare.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: parquet-comp-service
+                port:
+                  number: 80
