@@ -6,6 +6,12 @@ import pandas as pd
 import io
 import csv
 from pathlib import Path
+import sys
+
+# Ensure backend directory is in sys.path for serverless execution environments
+backend_dir = str(Path(__file__).parent.resolve())
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 from models import (
     FileUploadResponse, CompareRequest, CompareResponse, JobStatusResponse
@@ -23,6 +29,28 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Parquet Comparison API", lifespan=lifespan)
+
+# Strip /api prefix if present so routes match both /api/... (Vercel rewrite) and /... (Docker / local dev)
+class StripAPIPrefixMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            path = scope.get("path", "")
+            if path.startswith("/api/"):
+                scope = dict(scope)
+                scope["path"] = path[4:]
+                if "raw_path" in scope:
+                    scope["raw_path"] = scope["path"].encode("ascii")
+            elif path == "/api":
+                scope = dict(scope)
+                scope["path"] = "/"
+                if "raw_path" in scope:
+                    scope["raw_path"] = b"/"
+        await self.app(scope, receive, send)
+
+app.add_middleware(StripAPIPrefixMiddleware)
 
 # Configure CORS
 # DOCKER: Allow all origins for Docker deployment (Nginx serves frontend and proxies API)
