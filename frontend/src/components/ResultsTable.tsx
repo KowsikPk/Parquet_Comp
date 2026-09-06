@@ -4,8 +4,8 @@ import InlineDiffView from './InlineDiffView';
 
 interface ResultsTableProps {
   results: ComparisonResult[];
-  filter: 'all' | 'match' | 'mismatch' | 'only_in_a' | 'only_in_b';
-  onFilterChange: (filter: 'all' | 'match' | 'mismatch' | 'only_in_a' | 'only_in_b') => void;
+  filter: 'all' | 'match' | 'mismatch' | 'partial_match' | 'only_in_a' | 'only_in_b';
+  onFilterChange: (filter: 'all' | 'match' | 'mismatch' | 'partial_match' | 'only_in_a' | 'only_in_b') => void;
   columnsCompared: string[];
   fileAName?: string;
   fileBName?: string;
@@ -59,8 +59,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
     return name.substring(0, maxLength - 3) + '...';
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (result: ComparisonResult) => {
+    switch (result.status) {
       case 'match':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -75,10 +75,17 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
             Mismatch
           </span>
         );
-      case 'only_in_a':
+      case 'partial_match':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5"></span>
+            Partial ({result.match_percentage || 0}%)
+          </span>
+        );
+      case 'only_in_a':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 mr-1.5"></span>
             Only A
           </span>
         );
@@ -140,7 +147,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
 
       {/* Status Tabs */}
       <div className="flex flex-wrap gap-2">
-        {(['all', 'match', 'mismatch', 'only_in_a', 'only_in_b'] as const).map((status) => {
+        {(['all', 'match', 'mismatch', 'partial_match', 'only_in_a', 'only_in_b'] as const).map((status) => {
           const count = status === 'all' ? results.length : results.filter(r => r.status === status).length;
           const isActive = filter === status;
           return (
@@ -161,6 +168,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
               <span>
                 {status === 'all' && 'All'}
                 {status === 'match' && 'Matches'}
+                {status === 'partial_match' && 'Partial'}
                 {status === 'mismatch' && 'Mismatches'}
                 {status === 'only_in_a' && `Only ${truncateFilename(fileAName)}`}
                 {status === 'only_in_b' && `Only ${truncateFilename(fileBName)}`}
@@ -191,7 +199,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
               <React.Fragment key={result.row_key}>
                 <tr className="hover:bg-theme-elevated/60 transition-colors">
                   <td className="px-4 py-3 font-mono font-bold text-theme-text">{result.row_key}</td>
-                  <td className="px-4 py-3">{getStatusBadge(result.status)}</td>
+                  <td className="px-4 py-3">{getStatusBadge(result)}</td>
                   {columnsCompared.slice(0, 4).map(col => {
                     const val = result.row_data_a?.[col] ?? result.row_data_b?.[col];
                     const displayVal = typeof val === 'object' && val !== null 

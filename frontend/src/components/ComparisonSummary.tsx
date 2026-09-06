@@ -27,6 +27,7 @@ const ComparisonSummary: React.FC<ComparisonSummaryProps> = ({
     total_b: summary.total_b,
     matching: summary.matching,
     mismatching: summary.mismatching,
+    partial_match: summary.partial_match,
     only_in_a: summary.only_in_a,
     only_in_b: summary.only_in_b
   });
@@ -40,6 +41,7 @@ const ComparisonSummary: React.FC<ComparisonSummaryProps> = ({
       total_b: summary.total_b,
       matching: summary.matching,
       mismatching: summary.mismatching,
+      partial_match: summary.partial_match,
       only_in_a: summary.only_in_a,
       only_in_b: summary.only_in_b
     };
@@ -54,6 +56,7 @@ const ComparisonSummary: React.FC<ComparisonSummaryProps> = ({
         total_b: Math.round(targetValues.total_b * easeOutQuart),
         matching: Math.round(targetValues.matching * easeOutQuart),
         mismatching: Math.round(targetValues.mismatching * easeOutQuart),
+        partial_match: Math.round(targetValues.partial_match * easeOutQuart),
         only_in_a: Math.round(targetValues.only_in_a * easeOutQuart),
         only_in_b: Math.round(targetValues.only_in_b * easeOutQuart)
       });
@@ -88,7 +91,7 @@ const ComparisonSummary: React.FC<ComparisonSummaryProps> = ({
       {/* Main Grid: Metric Cards + Chart */}
       <div className="flex flex-col lg:flex-row gap-6 items-center">
         {/* Metric Cards Grid */}
-        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 w-full">
+        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 w-full">
           <MetricCard
             label={`${fileAName} Rows`}
             value={animatedValues.total_a}
@@ -123,6 +126,17 @@ const ComparisonSummary: React.FC<ComparisonSummaryProps> = ({
             icon={
               <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            }
+          />
+          <MetricCard
+            label="Partial Matches"
+            value={animatedValues.partial_match}
+            borderColor="#F59E0B"
+            textColor="text-amber-400"
+            icon={
+              <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             }
           />
@@ -166,6 +180,7 @@ const ComparisonSummary: React.FC<ComparisonSummaryProps> = ({
           <MatchRateChart
             matching={summary.matching}
             mismatching={summary.mismatching}
+            partial_match={summary.partial_match}
             onlyInA={summary.only_in_a}
             onlyInB={summary.only_in_b}
             fileAName={fileAName}

@@ -36,7 +36,8 @@ class DifferenceDetail(BaseModel):
 
 class ComparisonResult(BaseModel):
     row_key: str
-    status: str  # "match", "mismatch", "only_in_a", "only_in_b"
+    status: str  # "match", "mismatch", "partial_match", "only_in_a", "only_in_b"
+    match_percentage: Optional[float] = None
     differences: List[DifferenceDetail]
     row_data_a: Optional[Dict[str, str]] = None  # Actual row data from File A
     row_data_b: Optional[Dict[str, str]] = None  # Actual row data from File B
@@ -47,6 +48,7 @@ class ComparisonSummary(BaseModel):
     total_b: int
     matching: int
     mismatching: int
+    partial_match: int = 0
     only_in_a: int
     only_in_b: int
 

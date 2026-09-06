@@ -37,7 +37,7 @@ class TestComparisonEngine:
         assert result["summary"]["only_in_b"] == 0
 
     def test_compare_with_different_values(self):
-        """Test that different values are reported as mismatches."""
+        """Test that different values are reported as partial matches if some columns still match."""
         data_a = [
             {"ObjectId": "obj1", "name": "Item 1", "value": 100},
             {"ObjectId": "obj2", "name": "Item 2", "value": 200}
@@ -52,7 +52,7 @@ class TestComparisonEngine:
         result = comparison_engine.compare_dataframes(df_a, df_b)
 
         assert result["summary"]["matching"] == 1
-        assert result["summary"]["mismatching"] == 1
+        assert result["summary"]["partial_match"] == 1
         assert result["summary"]["only_in_a"] == 0
         assert result["summary"]["only_in_b"] == 0
 
@@ -140,9 +140,9 @@ class TestComparisonEngine:
         df_a = pd.DataFrame(data_a)
         df_b = pd.DataFrame(data_b)
 
-        # Compare all columns - should have mismatch
+        # Compare all columns - should have partial_match since other cols match
         result_all = comparison_engine.compare_dataframes(df_a, df_b, columns=None)
-        assert result_all["summary"]["mismatching"] == 1
+        assert result_all["summary"]["partial_match"] == 1
 
         # Compare only name column - should match
         result_specific = comparison_engine.compare_dataframes(df_a, df_b, columns=["name"])

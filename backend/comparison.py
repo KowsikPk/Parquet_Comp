@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
 import uuid
 from datetime import datetime
-from json_normalizer import normalize_value, values_are_equal, compare_json_objects, get_json_differences, ensure_scalar
+from json_normalizer import normalize_value, values_are_equal, compare_json_objects, get_json_differences, ensure_scalar, calculate_similarity
 
 
 class ComparisonJob:
@@ -198,6 +198,7 @@ class ComparisonEngine:
         print(f"Total rows for comparison: {total_rows} (A: {len(df_a_indexed)}, B: {len(df_b_indexed)})")
         matching = 0
         mismatching = 0
+        partial_match = 0
         only_in_a = 0
         only_in_b = 0
         
@@ -246,6 +247,7 @@ class ComparisonEngine:
                     results.extend(chunk_results)
                     matching += chunk_stats["matching"]
                     mismatching += chunk_stats["mismatching"]
+                    partial_match += chunk_stats.get("partial_match", 0)
                     only_in_a += chunk_stats["only_in_a"]
                     only_in_b += chunk_stats["only_in_b"]
                     
@@ -271,6 +273,7 @@ class ComparisonEngine:
                 )
                 matching = stats["matching"]
                 mismatching = stats["mismatching"]
+                partial_match = stats.get("partial_match", 0)
                 only_in_a = stats["only_in_a"]
                 only_in_b = stats["only_in_b"]
             except Exception as e:
@@ -284,6 +287,7 @@ class ComparisonEngine:
             "total_b": len(df_b),
             "matching": matching,
             "mismatching": mismatching,
+            "partial_match": partial_match,
             "only_in_a": only_in_a,
             "only_in_b": only_in_b
         }
@@ -317,6 +321,7 @@ class ComparisonEngine:
         results = []
         matching = 0
         mismatching = 0
+        partial_match = 0
         only_in_a = 0
         only_in_b = 0
         
@@ -407,6 +412,9 @@ class ComparisonEngine:
                     if not found:
                         continue
                 
+                total_cols = 0
+                sim_sum = 0.0
+                
                 for col in comparison_columns:
                     col_a = f"{col}_a" if f"{col}_a" in row else col
                     col_b = f"{col}_b" if f"{col}_b" in row else col
@@ -414,6 +422,7 @@ class ComparisonEngine:
                     if col_a not in row or col_b not in row:
                         continue
                         
+                    total_cols += 1
                     val_a = row[col_a]
                     val_b = row[col_b]
                     
@@ -421,10 +430,12 @@ class ComparisonEngine:
                     is_na_b = (isinstance(val_b, float) and pd.isna(val_b)) or val_b is None
                     
                     if is_na_a and is_na_b:
+                        sim_sum += 1.0
                         continue
                     
                     # 3. Simple equality check first
                     if val_a == val_b:
+                        sim_sum += 1.0
                         continue
                         
                     # 4. Only run expensive JSON comparison on rows that fail simple equality
@@ -433,17 +444,29 @@ class ComparisonEngine:
                     
                     if not compare_json_objects(norm_a, norm_b, _is_normalized=True):
                         json_diffs = get_json_differences(norm_a, norm_b, _is_normalized=True)
-                        actual_diffs = [d for d in json_diffs if "differs" in d or "Values differ" in d]
-                        if actual_diffs:
+                        if json_diffs:
+                            sim = calculate_similarity(norm_a, norm_b, _is_normalized=True)
+                            sim_sum += sim
                             differences.append({
                                 "column": col,
-                                "value_a": str(val_a) if not is_na_a else "null",
-                                "value_b": str(val_b) if not is_na_b else "null",
+                                "value_a": "null" if is_na_a else self._convert_to_json_format(val_a),
+                                "value_b": "null" if is_na_b else self._convert_to_json_format(val_b),
                                 "diff_keys": json_diffs
                             })
+                        else:
+                            sim_sum += 1.0
+                    else:
+                        sim_sum += 1.0
                 
                 if differences:
-                    mismatching += 1
+                    match_percentage = round((sim_sum / total_cols) * 100, 1) if total_cols > 0 else 0.0
+                    if match_percentage > 0.0:
+                        status = "partial_match"
+                        partial_match += 1
+                    else:
+                        status = "mismatch"
+                        mismatching += 1
+                        
                     row_data_a = {}
                     row_data_b = {}
                     for col in all_display_columns:
@@ -456,7 +479,8 @@ class ComparisonEngine:
                             
                     results.append({
                         "row_key": row_key,
-                        "status": "mismatch",
+                        "status": status,
+                        "match_percentage": match_percentage,
                         "differences": differences,
                         "row_data_a": row_data_a,
                         "row_data_b": row_data_b
@@ -484,6 +508,7 @@ class ComparisonEngine:
         stats = {
             "matching": matching,
             "mismatching": mismatching,
+            "partial_match": partial_match,
             "only_in_a": only_in_a,
             "only_in_b": only_in_b
         }
@@ -538,9 +563,11 @@ class ComparisonEngine:
         Compare rows based on content matching - find rows with same values.
         This matches rows where ALL selected column values are equal, regardless of row order.
         """
+        # Initialize result containers
         results = []
         matching = 0
         mismatching = 0
+        partial_match = 0
         only_in_a = 0
         only_in_b = 0
         
@@ -569,6 +596,7 @@ class ComparisonEngine:
         
         # Match rows from File A
         a_matched_hashes = set()
+        unmatched_a_list = []
         for idx_a, row_tuple in enumerate(df_a.itertuples(index=False)):
             row_a = row_tuple._asdict()
             hash_key = create_content_hash(row_a, columns)
@@ -603,25 +631,10 @@ class ComparisonEngine:
                     "row_data_b": row_data_b
                 })
             else:
-                # Row only in A (no matching content in B)
-                only_in_a += 1
-                
-                # UI IMPROVEMENT: Build row data (use all_display_columns)
-                row_data_a = {}
-                for col in all_display_columns:
-                    if col in row_a:
-                        val = ensure_scalar(row_a[col])
-                        row_data_a[col] = self._convert_to_json_format(val)
-                
-                results.append({
-                    "row_key": f"row_{idx_a}",
-                    "status": "only_in_a",
-                    "differences": [],
-                    "row_data_a": row_data_a,
-                    "row_data_b": None
-                })
+                unmatched_a_list.append((idx_a, row_a))
         
         # Find unmatched rows in B
+        unmatched_b_list = []
         for hash_key, (idx_b, row_b) in b_content_map.items():
             if hash_key not in b_matched_hashes:
                 # Apply keyword filter if specified
@@ -629,16 +642,121 @@ class ComparisonEngine:
                     row_str = ' '.join(str(row_b[col]) for col in columns if col in row_b)
                     if keyword_filter not in row_str:
                         continue
+                unmatched_b_list.append((idx_b, row_b))
                 
+        # Attempt greedy partial matching if dimensions are reasonable (<= 10000 pairs)
+        matched_a_indices = set()
+        matched_b_indices = set()
+        
+        if len(unmatched_a_list) > 0 and len(unmatched_b_list) > 0 and (len(unmatched_a_list) * len(unmatched_b_list) <= 25000):
+            # Compute similarities
+            similarities = []
+            for i, (idx_a, row_a) in enumerate(unmatched_a_list):
+                for j, (idx_b, row_b) in enumerate(unmatched_b_list):
+                    sim_sum = 0.0
+                    valid_cols = 0
+                    for col in columns:
+                        if col in row_a or col in row_b:
+                            valid_cols += 1
+                            val_a = ensure_scalar(row_a.get(col, None))
+                            val_b = ensure_scalar(row_b.get(col, None))
+                            
+                            is_na_a = (isinstance(val_a, float) and pd.isna(val_a)) or val_a is None
+                            is_na_b = (isinstance(val_b, float) and pd.isna(val_b)) or val_b is None
+                            
+                            if is_na_a and is_na_b:
+                                sim_sum += 1.0
+                            elif values_are_equal(val_a, val_b):
+                                sim_sum += 1.0
+                            else:
+                                norm_a = normalize_value(val_a)
+                                norm_b = normalize_value(val_b)
+                                sim_sum += calculate_similarity(norm_a, norm_b)
+                    
+                    match_percentage = (sim_sum / valid_cols * 100) if valid_cols > 0 else 0
+                    if match_percentage >= 40.0:  # Threshold for partial match
+                        similarities.append((match_percentage, i, j))
+            
+            # Sort descending by similarity
+            similarities.sort(key=lambda x: x[0], reverse=True)
+            
+            for sim, i, j in similarities:
+                if i in matched_a_indices or j in matched_b_indices:
+                    continue
+                
+                # Pair them!
+                matched_a_indices.add(i)
+                matched_b_indices.add(j)
+                idx_a, row_a = unmatched_a_list[i]
+                idx_b, row_b = unmatched_b_list[j]
+                
+                partial_match += 1
+                differences = []
+                
+                for col in columns:
+                    val_a = ensure_scalar(row_a.get(col, None))
+                    val_b = ensure_scalar(row_b.get(col, None))
+                    
+                    is_na_a = (isinstance(val_a, float) and pd.isna(val_a)) or val_a is None
+                    is_na_b = (isinstance(val_b, float) and pd.isna(val_b)) or val_b is None
+                    
+                    if is_na_a and is_na_b:
+                        continue
+                        
+                    if not values_are_equal(val_a, val_b):
+                        norm_a = normalize_value(val_a)
+                        norm_b = normalize_value(val_b)
+                        
+                        json_diffs = get_json_differences(norm_a, norm_b, _is_normalized=True)
+                        
+                        differences.append({
+                            "column": col,
+                            "value_a": "null" if is_na_a else self._convert_to_json_format(val_a),
+                            "value_b": "null" if is_na_b else self._convert_to_json_format(val_b),
+                            "diff_keys": json_diffs
+                        })
+                
+                row_data_a = {}
+                row_data_b = {}
+                for col in all_display_columns:
+                    if col in row_a:
+                        row_data_a[col] = self._convert_to_json_format(ensure_scalar(row_a[col]))
+                    if col in row_b:
+                        row_data_b[col] = self._convert_to_json_format(ensure_scalar(row_b[col]))
+                        
+                results.append({
+                    "row_key": f"row_{idx_a} (partial)",
+                    "status": "partial_match",
+                    "match_percentage": round(sim, 1),
+                    "differences": differences,
+                    "row_data_a": row_data_a,
+                    "row_data_b": row_data_b
+                })
+                
+        # Remaining unmatched A
+        for i, (idx_a, row_a) in enumerate(unmatched_a_list):
+            if i not in matched_a_indices:
+                only_in_a += 1
+                row_data_a = {}
+                for col in all_display_columns:
+                    if col in row_a:
+                        row_data_a[col] = self._convert_to_json_format(ensure_scalar(row_a[col]))
+                results.append({
+                    "row_key": f"row_{idx_a}",
+                    "status": "only_in_a",
+                    "differences": [],
+                    "row_data_a": row_data_a,
+                    "row_data_b": None
+                })
+                
+        # Remaining unmatched B
+        for j, (idx_b, row_b) in enumerate(unmatched_b_list):
+            if j not in matched_b_indices:
                 only_in_b += 1
-                
-                # UI IMPROVEMENT: Build row data (use all_display_columns)
                 row_data_b = {}
                 for col in all_display_columns:
                     if col in row_b:
-                        val = ensure_scalar(row_b[col])
-                        row_data_b[col] = self._convert_to_json_format(val)
-                
+                        row_data_b[col] = self._convert_to_json_format(ensure_scalar(row_b[col]))
                 results.append({
                     "row_key": f"row_{idx_b}",
                     "status": "only_in_b",
@@ -650,6 +768,7 @@ class ComparisonEngine:
         stats = {
             "matching": matching,
             "mismatching": mismatching,
+            "partial_match": partial_match,
             "only_in_a": only_in_a,
             "only_in_b": only_in_b
         }

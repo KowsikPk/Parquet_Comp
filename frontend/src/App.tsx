@@ -43,7 +43,7 @@ const App: React.FC = () => {
   const [isComparing, setIsComparing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'match' | 'mismatch' | 'only_in_a' | 'only_in_b'>('all');
+  const [filter, setFilter] = useState<'all' | 'match' | 'mismatch' | 'partial_match' | 'only_in_a' | 'only_in_b'>('all');
 
   // Dark mode toggle
   const toggleDarkMode = () => {

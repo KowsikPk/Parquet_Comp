@@ -22,12 +22,15 @@ export interface DifferenceDetail {
   diff_keys: string[];
 }
 
+export type RowStatus = 'match' | 'mismatch' | 'partial_match' | 'only_in_a' | 'only_in_b';
+
 export interface ComparisonResult {
   row_key: string;
-  status: 'match' | 'mismatch' | 'only_in_a' | 'only_in_b';
+  status: RowStatus;
+  match_percentage?: number;
   differences: DifferenceDetail[];
-  row_data_a?: { [key: string]: string } | null;  // Actual row data from File A
-  row_data_b?: { [key: string]: string } | null;  // Actual row data from File B
+  row_data_a?: { [key: string]: string } | null;
+  row_data_b?: { [key: string]: string } | null;
 }
 
 export interface ComparisonSummary {
@@ -35,6 +38,7 @@ export interface ComparisonSummary {
   total_b: number;
   matching: number;
   mismatching: number;
+  partial_match: number;
   only_in_a: number;
   only_in_b: number;
 }

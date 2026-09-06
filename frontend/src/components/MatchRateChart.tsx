@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 interface MatchRateChartProps {
   matching: number;
+  partial_match: number;
   mismatching: number;
   onlyInA: number;
   onlyInB: number;
@@ -11,6 +12,7 @@ interface MatchRateChartProps {
 
 const MatchRateChart: React.FC<MatchRateChartProps> = ({
   matching,
+  partial_match,
   mismatching,
   onlyInA,
   onlyInB,
@@ -21,11 +23,11 @@ const MatchRateChart: React.FC<MatchRateChartProps> = ({
   const [progress, setProgress] = useState(0);
   const chartRef = useRef<SVGSVGElement>(null);
 
-  const total = matching + mismatching + onlyInA + onlyInB;
+  const total = matching + partial_match + mismatching + onlyInA + onlyInB;
   const matchingPercent = total > 0 ? (matching / total) * 100 : 0;
+  const partialPercent = total > 0 ? (partial_match / total) * 100 : 0;
   const mismatchingPercent = total > 0 ? (mismatching / total) * 100 : 0;
   const onlyInAPercent = total > 0 ? (onlyInA / total) * 100 : 0;
-  const onlyInBPercent = total > 0 ? (onlyInB / total) * 100 : 0;
 
   useEffect(() => {
     if (!hasAnimated && chartRef.current) {
@@ -60,9 +62,10 @@ const MatchRateChart: React.FC<MatchRateChartProps> = ({
 
   const segments = [
     { start: 0, end: matchingPercent, color: '#10B981' },
-    { start: matchingPercent, end: matchingPercent + mismatchingPercent, color: '#EF4444' },
-    { start: matchingPercent + mismatchingPercent, end: matchingPercent + mismatchingPercent + onlyInAPercent, color: '#F59E0B' },
-    { start: matchingPercent + mismatchingPercent + onlyInAPercent, end: matchingPercent + mismatchingPercent + onlyInAPercent + onlyInBPercent, color: '#38BDF8' }
+    { start: matchingPercent, end: matchingPercent + partialPercent, color: '#F59E0B' },
+    { start: matchingPercent + partialPercent, end: matchingPercent + partialPercent + mismatchingPercent, color: '#EF4444' },
+    { start: matchingPercent + partialPercent + mismatchingPercent, end: matchingPercent + partialPercent + mismatchingPercent + onlyInAPercent, color: '#F97316' },
+    { start: matchingPercent + partialPercent + mismatchingPercent + onlyInAPercent, end: 100, color: '#38BDF8' }
   ];
 
   return (
@@ -121,11 +124,15 @@ const MatchRateChart: React.FC<MatchRateChartProps> = ({
           <span>Matching</span>
         </div>
         <div className="flex items-center space-x-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+          <span>Partial</span>
+        </div>
+        <div className="flex items-center space-x-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
           <span>Mismatching</span>
         </div>
         <div className="flex items-center space-x-1.5" title={`Only in ${fileAName}`}>
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
           <span className="truncate max-w-[70px]">Only {fileAName}</span>
         </div>
         <div className="flex items-center space-x-1.5" title={`Only in ${fileBName}`}>

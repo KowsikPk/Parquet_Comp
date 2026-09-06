@@ -141,3 +141,49 @@ def get_json_differences(obj_a: Any, obj_b: Any, _is_normalized: bool = False) -
         differences.append(f"Values differ: A={norm_a}, B={norm_b}")
     
     return differences
+
+def flatten_json_pairs(val: Any, prefix: str = '') -> set:
+    """Flatten a normalized JSON value into a set of (path, value_str) tuples."""
+    items = set()
+    if isinstance(val, dict):
+        for k, v in val.items():
+            new_prefix = f"{prefix}.{k}" if prefix else k
+            items.update(flatten_json_pairs(v, new_prefix))
+    elif isinstance(val, list):
+        for i, v in enumerate(val):
+            new_prefix = f"{prefix}[{i}]"
+            items.update(flatten_json_pairs(v, new_prefix))
+    else:
+        # Convert primitive values to string representation
+        if val is None:
+            items.add((prefix, "null"))
+        else:
+            items.add((prefix, str(val)))
+    return items
+
+def calculate_similarity(val_a: Any, val_b: Any, _is_normalized: bool = False) -> float:
+    """
+    Calculate Jaccard similarity between two JSON structures based on flattened key-value pairs.
+    Returns a float between 0.0 and 1.0.
+    """
+    if not _is_normalized:
+        norm_a = normalize_value(val_a)
+        norm_b = normalize_value(val_b)
+    else:
+        norm_a = val_a
+        norm_b = val_b
+        
+    pairs_a = flatten_json_pairs(norm_a)
+    pairs_b = flatten_json_pairs(norm_b)
+    
+    if not pairs_a and not pairs_b:
+        return 1.0 if norm_a == norm_b else 0.0
+        
+    intersection = pairs_a.intersection(pairs_b)
+    union = pairs_a.union(pairs_b)
+    
+    if not union:
+        return 0.0
+        
+    return len(intersection) / len(union)
+
