@@ -539,6 +539,7 @@ const App: React.FC = () => {
 
                 <ComparisonSummary
                   summary={comparisonResult.summary}
+                  results={comparisonResult.results}
                   columnsCompared={comparisonResult.columns_compared}
                   fileAName={fileADisplayName}
                   fileBName={fileBDisplayName}

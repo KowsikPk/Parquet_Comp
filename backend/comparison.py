@@ -96,6 +96,7 @@ class ComparisonEngine:
                 )
                 matching = stats["matching"]
                 mismatching = stats["mismatching"]
+                partial_match = stats.get("partial_match", 0)
                 only_in_a = stats["only_in_a"]
                 only_in_b = stats["only_in_b"]
                 
@@ -104,6 +105,7 @@ class ComparisonEngine:
                     "total_b": len(df_b),
                     "matching": matching,
                     "mismatching": mismatching,
+                    "partial_match": partial_match,
                     "only_in_a": only_in_a,
                     "only_in_b": only_in_b
                 }

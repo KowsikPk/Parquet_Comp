@@ -6,6 +6,7 @@ interface MatchRateChartProps {
   mismatching: number;
   onlyInA: number;
   onlyInB: number;
+  totalRows: number;
   fileAName?: string;
   fileBName?: string;
 }
@@ -16,6 +17,7 @@ const MatchRateChart: React.FC<MatchRateChartProps> = ({
   mismatching,
   onlyInA,
   onlyInB,
+  totalRows,
   fileAName = 'A',
   fileBName = 'B'
 }) => {
@@ -23,11 +25,12 @@ const MatchRateChart: React.FC<MatchRateChartProps> = ({
   const [progress, setProgress] = useState(0);
   const chartRef = useRef<SVGSVGElement>(null);
 
-  const total = matching + partial_match + mismatching + onlyInA + onlyInB;
-  const matchingPercent = total > 0 ? (matching / total) * 100 : 0;
-  const partialPercent = total > 0 ? (partial_match / total) * 100 : 0;
-  const mismatchingPercent = total > 0 ? (mismatching / total) * 100 : 0;
-  const onlyInAPercent = total > 0 ? (onlyInA / total) * 100 : 0;
+  const total = totalRows > 0 ? totalRows : 1;
+  const matchingPercent = (matching / total) * 100;
+  const partialPercent = (partial_match / total) * 100;
+  const mismatchingPercent = (mismatching / total) * 100;
+  const onlyInAPercent = (onlyInA / total) * 100;
+  const onlyInBPercent = (onlyInB / total) * 100;
 
   useEffect(() => {
     if (!hasAnimated && chartRef.current) {
@@ -60,18 +63,24 @@ const MatchRateChart: React.FC<MatchRateChartProps> = ({
     return { strokeDasharray, strokeDashoffset: -startOffset, color };
   };
 
+  const seg0End = matchingPercent;
+  const seg1End = seg0End + partialPercent;
+  const seg2End = seg1End + mismatchingPercent;
+  const seg3End = seg2End + onlyInAPercent;
+  const seg4End = seg3End + onlyInBPercent;
+
   const segments = [
-    { start: 0, end: matchingPercent, color: '#10B981' },
-    { start: matchingPercent, end: matchingPercent + partialPercent, color: '#F59E0B' },
-    { start: matchingPercent + partialPercent, end: matchingPercent + partialPercent + mismatchingPercent, color: '#EF4444' },
-    { start: matchingPercent + partialPercent + mismatchingPercent, end: matchingPercent + partialPercent + mismatchingPercent + onlyInAPercent, color: '#F97316' },
-    { start: matchingPercent + partialPercent + mismatchingPercent + onlyInAPercent, end: 100, color: '#38BDF8' }
+    { start: 0, end: seg0End, color: '#10B981' },
+    { start: seg0End, end: seg1End, color: '#F59E0B' },
+    { start: seg1End, end: seg2End, color: '#EF4444' },
+    { start: seg2End, end: seg3End, color: '#F97316' },
+    { start: seg3End, end: seg4End, color: '#38BDF8' }
   ];
 
   return (
     <div className="flex flex-col items-center">
       <svg ref={chartRef} width="150" height="150" viewBox="0 0 150 150">
-        <circle cx="75" cy="75" r="50" fill="none" stroke="#171B2E" strokeWidth="18" />
+        <circle cx="75" cy="75" r="50" fill="none" className="stroke-theme-border" strokeWidth="18" />
         {segments.map((segment, index) => {
           const { strokeDasharray, strokeDashoffset, color } = createDonutSegment(
             segment.start,
